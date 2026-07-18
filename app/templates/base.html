@@ -39,8 +39,9 @@
     </nav>
   </aside>
 
-  <div class="offcanvas offcanvas-start mobile-sidebar" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
-    <div class="offcanvas-header">
+  <div class="mobile-sidebar-overlay" id="mobileSidebarOverlay"></div>
+  <aside class="mobile-sidebar-drawer" id="mobileSidebar" aria-label="قائمة التنقل المحمول">
+    <div class="mobile-sidebar-header">
       <div class="brand mb-0">
         <span class="brand-mark"><i class="bi bi-telegram"></i></span>
         <span>
@@ -48,9 +49,11 @@
           <small>Control Hub</small>
         </span>
       </div>
-      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button>
+      <button type="button" class="btn btn-light btn-sm mobile-sidebar-close" aria-label="إغلاق">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
-    <div class="offcanvas-body">
+    <div class="mobile-sidebar-body">
       <div class="role-chip mb-3">{{ current_user.role_label }}</div>
       <nav class="side-nav">
         <a href="{{ url_for('main.dashboard') }}"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></a>
@@ -68,11 +71,11 @@
         {% if current_user.has_permission('users.manage') %}<a href="{{ url_for('admin.users') }}"><i class="bi bi-shield-lock"></i><span>المستخدمون والصلاحيات</span></a>{% endif %}
       </nav>
     </div>
-  </div>
+  </aside>
   <div class="main-area">
     <header class="topbar">
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-secondary btn-sm mobile-menu-toggle d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="فتح قائمة التنقل">
+        <button class="btn btn-outline-secondary btn-sm mobile-menu-toggle d-lg-none" type="button" aria-controls="mobileSidebar" aria-label="فتح قائمة التنقل">
           <i class="bi bi-list"></i>
         </button>
         <div>
@@ -140,6 +143,53 @@
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const toggle = document.querySelector('.mobile-menu-toggle');
+    const drawer = document.getElementById('mobileSidebar');
+    const overlay = document.getElementById('mobileSidebarOverlay');
+    const closeBtn = document.querySelector('.mobile-sidebar-close');
+    const navLinks = drawer ? drawer.querySelectorAll('.side-nav a') : [];
+
+    function setDrawerState(open) {
+      drawer.classList.toggle('show', open);
+      overlay.classList.toggle('show', open);
+      document.body.classList.toggle('mobile-menu-open', open);
+    }
+
+    if (toggle && drawer && overlay && closeBtn) {
+      toggle.addEventListener('click', function () {
+        setDrawerState(true);
+      });
+
+      closeBtn.addEventListener('click', function () {
+        setDrawerState(false);
+      });
+
+      overlay.addEventListener('click', function () {
+        setDrawerState(false);
+      });
+
+      navLinks.forEach(function (link) {
+        link.addEventListener('click', function () {
+          setDrawerState(false);
+        });
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          setDrawerState(false);
+        }
+      });
+
+      window.addEventListener('resize', function () {
+        if (window.innerWidth >= 992) {
+          setDrawerState(false);
+        }
+      });
+    }
+  });
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
