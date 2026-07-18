@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">إعدادات القناة</span><h1>ربط القناة وروابط التواصل</h1><p>اضبط القناة وحساب النشر والروابط الافتراضية التي ستدخل داخل القوالب.</p></div></div>
+<form method="post" class="row g-4">
+  <div class="col-xl-8">
+    <div class="panel-card p-4">
+      <label class="form-label">رابط القناة أو المعرف</label>
+      <input class="form-control mb-3" name="channel_ref" value="{{ settings.channel_ref or '' }}" placeholder="https://t.me/your_channel أو @your_channel" required>
+      <label class="form-label">اسم القناة للعرض الداخلي</label>
+      <input class="form-control mb-3" name="channel_title" value="{{ settings.channel_title or '' }}" placeholder="MedResearch Hub">
+      <label class="form-label">حساب النشر</label>
+      <select class="form-select mb-3" name="publisher_account_id">
+        <option value="">اختر حساباً</option>
+        {% for acc in accounts %}<option value="{{ acc.id }}" {{ 'selected' if settings.publisher_account_id==acc.id else '' }}>{{ acc.display_name or acc.phone_masked or acc.id }}</option>{% endfor %}
+      </select>
+      <div class="alert alert-info small">يجب أن يكون حساب النشر مشرفاً في القناة ولديه صلاحية نشر الرسائل وتعديلها إذا أردت تحديث الفهرس.</div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel-card p-4">
+      <label class="form-label">رابط الموقع</label><input class="form-control mb-2" name="website_url" value="{{ settings.website_url or '' }}" placeholder="https://...">
+      <label class="form-label">رابط التسجيل</label><input class="form-control mb-2" name="registration_url" value="{{ settings.registration_url or '' }}" placeholder="https://...">
+      <label class="form-label">رابط التواصل العام</label><input class="form-control mb-2" name="contact_url" value="{{ settings.contact_url or '' }}" placeholder="https://t.me/...">
+      <label class="form-label">رابط WhatsApp</label><input class="form-control mb-2" name="whatsapp_url" value="{{ settings.whatsapp_url or '' }}" placeholder="https://wa.me/...">
+      <label class="form-label">رابط Telegram للتواصل</label><input class="form-control mb-3" name="telegram_contact_url" value="{{ settings.telegram_contact_url or '' }}" placeholder="https://t.me/...">
+      <input type="hidden" name="default_style" value="research_professional">
+      <button class="btn btn-primary w-100">حفظ الإعدادات</button>
+      <a href="{{ url_for('channel.dashboard') }}" class="btn btn-outline-secondary w-100 mt-2">رجوع</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

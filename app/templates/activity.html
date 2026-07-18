@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}سجل التدقيق{% endblock %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">Audit Trail</span><h1>سجل التدقيق</h1><p>أهم العمليات الإدارية والتشغيلية داخل النظام.</p></div></div>
+<div class="panel-card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>#</th><th>الإجراء</th><th>الكيان</th><th>المعرّف</th><th>التفاصيل</th><th>IP</th><th>التاريخ</th></tr></thead><tbody>{% for log in logs %}<tr><td>{{ log.id }}</td><td><b>{{ log.action }}</b></td><td>{{ log.entity_type or '-' }}</td><td>{{ log.entity_id or '-' }}</td><td class="text-truncate" style="max-width:360px">{{ log.details or '-' }}</td><td>{{ log.ip_address or '-' }}</td><td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% else %}<tr><td colspan="7" class="empty-state">لا توجد عمليات مدققة بعد.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

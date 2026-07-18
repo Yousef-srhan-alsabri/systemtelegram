@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}مركز إدارة تيليجرام{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static',filename='css/app.css') }}">
+</head>
+<body>
+{% if current_user.is_authenticated %}
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">T</span><span>مركز تيليجرام</span></a>
+    <div class="role-chip mb-3">{{ current_user.role_label }}</div>
+    <nav class="side-nav">
+      <a href="{{ url_for('main.dashboard') }}">لوحة التحكم</a>
+      {% if current_user.has_permission('telegram.accounts') %}<a href="{{ url_for('accounts.index') }}">حسابات تيليجرام</a>{% endif %}
+      {% if current_user.has_permission('campaigns.manage') %}<a href="{{ url_for('messages.create') }}">الحملات والمهام</a>{% endif %}
+      {% if current_user.has_permission('content.manage') %}<a href="{{ url_for('content.index') }}">المحتوى الإعلاني</a>{% endif %}
+      {% if current_user.has_permission('channel.manage') %}<a href="{{ url_for('channel.dashboard') }}">إدارة القناة</a>{% endif %}
+      {% if current_user.has_permission('search.manage') %}<a href="{{ url_for('search.index') }}">البحث والاستكشاف</a>{% endif %}
+      {% if current_user.has_permission('join.manage') %}<a href="{{ url_for('join_manager.index') }}">مدير الانضمام</a>{% endif %}
+      {% if current_user.has_permission('links.manage') %}<a href="{{ url_for('links.index') }}">مدير الروابط</a>{% endif %}
+      {% if current_user.has_permission('reports.view') %}<a href="{{ url_for('reports.index') }}">السجلات والتقارير</a>{% endif %}
+      {% if current_user.has_permission('operations.manage') %}<a href="{{ url_for('operations.index') }}">التشغيل والإنتاج</a>{% endif %}
+      {% if current_user.has_permission('settings.manage') %}<a href="{{ url_for('settings.index') }}">الإعدادات</a>{% endif %}
+      {% if current_user.has_permission('audit.view') %}<a href="{{ url_for('activity.index') }}">سجل التدقيق</a>{% endif %}
+      {% if current_user.has_permission('users.manage') %}<a href="{{ url_for('admin.users') }}">المستخدمون والصلاحيات</a>{% endif %}
+    </nav>
+  </aside>
+  <div class="main-area">
+    <header class="topbar">
+      <div><div class="topbar-title">لوحة تشغيل موحدة</div><small>إدارة الحسابات، البحث، الانضمام، الحملات والتقارير</small></div>
+      <div class="d-flex align-items-center gap-2"><span class="user-chip-dark">{{ current_user.email }}</span><form method="post" action="{{ url_for('auth.logout') }}"><button class="btn btn-outline-secondary btn-sm">خروج</button></form></div>
+    </header>
+    <main class="container-fluid app-shell px-3 px-lg-4 py-4">
+{% else %}
+    <main class="container-fluid app-shell px-3 px-lg-4 py-4">
+{% endif %}
+      {% with messages=get_flashed_messages(with_categories=true) %}
+        {% for category,message in messages %}<div class="alert alert-{{ category }} shadow-sm">{{ message }}</div>{% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+{% if current_user.is_authenticated %}
+  </div>
+</div>
+{% endif %}
+
+{% if active_campaign_controls %}
+<button class="campaign-control-fab" type="button" data-bs-toggle="offcanvas" data-bs-target="#campaignControlDrawer" aria-controls="campaignControlDrawer" aria-label="فتح مركز الحملات النشطة">
+  <span class="fab-icon">🚀</span>
+  <span class="fab-text">الحملات النشطة</span>
+  <span class="fab-count">{{ active_campaign_controls|length }}</span>
+</button>
+<div class="offcanvas offcanvas-end campaign-control-drawer" tabindex="-1" id="campaignControlDrawer" aria-labelledby="campaignControlDrawerLabel">
+  <div class="offcanvas-header">
+    <div>
+      <div class="eyebrow">مركز تحكم غير مزعج</div>
+      <h5 class="offcanvas-title mb-0" id="campaignControlDrawerLabel">الحملات النشطة</h5>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button>
+  </div>
+  <div class="offcanvas-body">
+    <p class="text-muted small">تظهر هنا الحملات الجارية أو المجدولة فقط. النافذة لا تغطي الصفحات إلا عند فتحها يدوياً.</p>
+    <div class="vstack gap-3">
+      {% for c in active_campaign_controls %}
+        <div class="drawer-campaign-card">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="min-w-0">
+              <a class="fw-bold text-decoration-none d-block text-truncate" href="{{ url_for('messages.campaign_detail', campaign_id=c.id) }}">{{ c.name }}</a>
+              <span class="status-pill status-{{ c.status }} mt-2">{{ c.status|ar_status }}</span>
+            </div>
+            <a class="btn btn-sm btn-light" href="{{ url_for('messages.campaign_detail', campaign_id=c.id) }}">التفاصيل</a>
+          </div>
+          <div class="drawer-actions mt-3">
+            <form method="post" action="{{ url_for('messages.campaign_pause', campaign_id=c.id) }}"><button class="btn btn-sm btn-warning w-100">⏸ إيقاف</button></form>
+            <form method="post" action="{{ url_for('messages.campaign_resume', campaign_id=c.id) }}"><button class="btn btn-sm btn-success w-100">▶ استئناف</button></form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div><span class="eyebrow">مزامنة تلقائية</span><h1>مجموعات {{ account.display_name or account.id }}</h1><p>كل المجموعات الظاهرة تدخل تلقائياً ضمن خيار «جميع المجموعات» في الحملات.</p></div>
+  <form method="post" action="{{ url_for('accounts.sync',account_id=account.id) }}"><button class="btn btn-primary">تحديث المجموعات</button></form>
+</div>
+<form class="panel-card p-3 mb-3"><div class="input-group"><input class="form-control" name="q" value="{{ q }}" placeholder="ابحث باسم المجموعة"><button class="btn btn-outline-primary">بحث</button></div></form>
+<div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">المجموعات المتزامنة <span class="count-badge">{{ groups|length }}</span></h2></div><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>المجموعة</th><th>المعرف</th><th>حالة الإدراج</th></tr></thead><tbody>
+{% for g in groups %}<tr><td class="fw-semibold">{{ g.title }}</td><td>{{ '@'+g.username if g.username else g.telegram_group_id }}</td><td><span class="status-pill status-active">تلقائي</span></td></tr>{% else %}<tr><td colspan="3" class="empty-state">لا توجد مجموعات. اضغط تحديث المجموعات وانتظر قليلاً.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

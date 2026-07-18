@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">الحملة #{{ campaign.id }}</span>
+    <h1>{{ campaign.name }}</h1>
+    <p>دفعة {{ campaign.batch_size }} — المصدر: {{ campaign.source_mode|ar_status }} — جميع المجموعات المتزامنة. التعديل أو الإيقاف يؤثر على الإرسالات القادمة فقط.</p>
+  </div>
+  <span class="status-pill status-{{ campaign.status }}">{{ campaign.status|ar_status }}</span>
+</div>
+
+<div class="row g-3 mb-4">
+  {% set total=namespace(groups=0,sent=0,failed=0,skipped=0,pending=0) %}
+  {% for t in tasks %}
+    {% set total.groups=total.groups+t.total_groups %}
+    {% set total.sent=total.sent+t.sent_count %}
+    {% set total.failed=total.failed+t.failed_count %}
+    {% set total.skipped=total.skipped+t.skipped_count %}
+    {% set total.pending=total.pending+(t.total_groups-t.sent_count-t.failed_count-t.skipped_count) %}
+  {% endfor %}
+  <div class="col-md-3"><div class="metric-card"><div class="metric-label">إجمالي المجموعات</div><div class="metric-value">{{ total.groups }}</div></div></div>
+  <div class="col-md-3"><div class="metric-card"><div class="metric-label">تم الإرسال</div><div class="metric-value">{{ total.sent }}</div></div></div>
+  <div class="col-md-3"><div class="metric-card"><div class="metric-label">متبقّي تقريباً</div><div class="metric-value">{{ total.pending if total.pending > 0 else 0 }}</div></div></div>
+  <div class="col-md-3"><div class="metric-card"><div class="metric-label">فشل / تخطي</div><div class="metric-value">{{ total.failed + total.skipped }}</div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-7">
+    <div class="panel-card p-4 h-100">
+      <div class="panel-heading"><h2 class="h5 mb-0">التحكم بالحملة</h2></div>
+      {% set risk_tasks = tasks|selectattr('status','equalto','risk_hold')|list %}
+      {% if risk_tasks %}
+      <div class="risk-alert mb-3">
+        <strong>تم إيقاف حساب/حسابات لحماية الحساب من القيود.</strong>
+        <div class="small text-muted mt-1">يمكنك المتابعة يدوياً، لكن ذلك يعني أنك تتحمل مسؤولية الحساب.</div>
+        <form method="post" class="mt-2" action="{{ url_for('messages.campaign_risk_override', campaign_id=campaign.id) }}" onsubmit="return confirm('تأكيد الاستمرار رغم مستوى الخطر؟');">
+          <button class="btn btn-danger btn-sm">الاستمرار رغم الخطر</button>
+        </form>
+      </div>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{{ url_for('messages.campaign_pause', campaign_id=campaign.id) }}">
+          <button class="btn btn-warning" {% if campaign.status in ['paused','completed','cancelled'] %}disabled{% endif %}>إيقاف مؤقت</button>
+        </form>
+        <form method="post" action="{{ url_for('messages.campaign_resume', campaign_id=campaign.id) }}">
+          <button class="btn btn-success" {% if campaign.status not in ['paused','pause_requested','finished_with_issues'] %}disabled{% endif %}>استئناف</button>
+        </form>
+        <form method="post" action="{{ url_for('messages.campaign_cancel', campaign_id=campaign.id) }}" onsubmit="return confirm('تأكيد إلغاء الحملة؟ لن يتم إرسال أهداف جديدة.');">
+          <button class="btn btn-outline-danger" {% if campaign.status in ['completed','cancelled'] %}disabled{% endif %}>إلغاء</button>
+        </form>
+      </div>
+      <div class="alert alert-light border mt-3 mb-0 small">
+        الإيقاف المؤقت لا يقطع رسالة قيد الإرسال حالياً؛ يتوقف العامل بعد الرسالة الحالية وقبل الهدف التالي. الاستئناف لا يعيد الإرسال للأهداف التي حالتها <strong>تم الإرسال</strong>.
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="panel-card p-4 h-100">
+      <div class="panel-heading"><h2 class="h5 mb-0">تعديل رسالة الحملة</h2></div>
+      <form method="post" action="{{ url_for('messages.campaign_edit_text', campaign_id=campaign.id) }}">
+        <textarea class="form-control" name="text" rows="6">{{ campaign.text }}</textarea>
+        <div class="form-text mt-2">يحفظ نصاً خاصاً بهذه الحملة ويطبّقه على الإرسالات القادمة فقط. إذا كانت الحملة تستخدم محتوى محفوظاً مع صورة/ملف، فهذا التعديل يحوّل الإرسالات القادمة إلى نص فقط.</div>
+        <button class="btn btn-primary mt-3">حفظ تعديل الرسالة</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="panel-card">
+  <div class="panel-heading"><h2 class="h5 mb-0">التنفيذ حسب الحساب</h2></div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>الحساب</th><th>الحالة</th><th>موعد النشر</th><th>المجموعات</th><th>تم</th><th>فشل</th><th>تخطي</th><th>سبب التوقف</th><th></th></tr></thead>
+      <tbody>
+      {% for t in tasks %}
+        <tr>
+          <td>{{ t.account.display_name or t.account_id }}</td>
+          <td><span class="status-pill status-{{ t.status }}">{{ t.status|ar_status }}</span></td>
+          <td class="small text-muted">{{ t.schedule_time.strftime('%Y-%m-%d %H:%M') if t.schedule_time else 'حالاً' }}</td>
+          <td>{{ t.total_groups }}</td><td>{{ t.sent_count }}</td><td>{{ t.failed_count }}</td><td>{{ t.skipped_count }}</td>
+          <td class="small text-muted">{{ t.stop_reason or t.last_risk_reason or '—' }}</td>
+          <td><a class="btn btn-sm btn-light" href="{{ url_for('messages.detail',task_id=t.id) }}">التفاصيل</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="empty-state">لا توجد مهام مرتبطة بهذه الحملة.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+services:
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:8000 --workers 2 wsgi:app
+    env_file: .env
+    ports: ["8000:8000"]
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+  worker:
+    build: .
+    command: celery -A celery_app.celery worker --loglevel=INFO --concurrency=2 --prefetch-multiplier=1
+    env_file: .env
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+  scheduler:
+    build: .
+    command: python scheduler_worker.py
+    env_file: .env
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: telegram_dashboard
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: change-me
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    volumes: ["redis_data:/data"]
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  redis_data:

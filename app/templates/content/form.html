@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">محرر المحتوى</span><h1>{{ 'تعديل محتوى' if item else 'محتوى جديد' }}</h1><p>استخدم أزرار التنسيق لإنشاء رسالة أقرب لتنسيق Telegram.</p></div></div>
+<form method="post" enctype="multipart/form-data" class="row g-4">
+  <div class="col-xl-8">
+    <div class="panel-card p-4">
+      <label class="form-label">عنوان داخلي</label>
+      <input class="form-control mb-3" name="title" value="{{ item.title if item else '' }}" required>
+      <label class="form-label">نوع المحتوى</label>
+      <select class="form-select mb-3" name="content_type" id="contentType">
+        {% set ct = item.content_type if item else 'text' %}
+        <option value="text" {{ 'selected' if ct=='text' else '' }}>نص منسق</option>
+        <option value="photo" {{ 'selected' if ct=='photo' else '' }}>صورة + نص</option>
+        <option value="document" {{ 'selected' if ct=='document' else '' }}>ملف + نص</option>
+        <option value="sticker" {{ 'selected' if ct=='sticker' else '' }}>ملصق</option>
+        <option value="contact" {{ 'selected' if ct=='contact' else '' }}>جهة اتصال</option>
+      </select>
+      <div id="editorBlock">
+        <div class="toolbar mb-2 d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm btn-light" data-tag="b">غامق</button>
+          <button type="button" class="btn btn-sm btn-light" data-tag="i">مائل</button>
+          <button type="button" class="btn btn-sm btn-light" data-tag="u">تحته خط</button>
+          <button type="button" class="btn btn-sm btn-light" data-tag="s">مشطوب</button>
+          <button type="button" class="btn btn-sm btn-light" data-tag="code">كود</button>
+          <button type="button" class="btn btn-sm btn-light" data-tag="blockquote">اقتباس</button>
+          <button type="button" class="btn btn-sm btn-light" id="spoilerBtn">مشوش</button>
+          <button type="button" class="btn btn-sm btn-light" id="linkBtn">رابط</button>
+          <button type="button" class="btn btn-sm btn-light" id="emojiBtn">✨</button>
+        </div>
+        <label class="form-label">النص / Caption بصيغة HTML</label>
+        <textarea class="form-control" id="bodyHtml" name="body_html" rows="10" placeholder="مثال: &lt;b&gt;عرض خاص&lt;/b&gt;">{{ item.body_html if item else '' }}</textarea>
+        <div class="form-text">يدعم Telegram غالباً: b, i, u, s, code, pre, blockquote, a. إذا رفض Telegram وسمًا معيناً، عدّل النص وأرسل اختباراً أولاً.</div>
+      </div>
+      <div id="fileBlock" class="mt-3">
+        <label class="form-label">ملف الوسائط</label>
+        <input class="form-control" type="file" name="media_file">
+        {% if item and item.media %}<div class="form-text">الملف الحالي: {{ item.media.original_filename }}. اتركه فارغاً للإبقاء عليه.</div>{% endif %}
+      </div>
+      <div id="contactBlock" class="mt-3">
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label">الاسم الأول</label><input class="form-control" name="contact_first_name" value="{{ item.contact_first_name if item else '' }}"></div>
+          <div class="col-md-4"><label class="form-label">الاسم الأخير</label><input class="form-control" name="contact_last_name" value="{{ item.contact_last_name if item else '' }}"></div>
+          <div class="col-md-4"><label class="form-label">رقم الهاتف</label><input class="form-control" name="contact_phone" value="{{ item.contact_phone if item else '' }}" placeholder="+966..."></div>
+        </div>
+      </div>
+      <div class="form-check mt-3">
+        <input class="form-check-input" type="checkbox" name="link_preview" id="linkPreview" {{ 'checked' if item and item.link_preview else '' }}>
+        <label class="form-check-label" for="linkPreview">إظهار معاينة الروابط عند الإرسال</label>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel-card p-4">
+      <label class="form-label">الحالة</label>
+      <select class="form-select" name="status">
+        {% set st = item.status if item else 'ready' %}
+        <option value="ready" {{ 'selected' if st=='ready' else '' }}>جاهز</option>
+        <option value="draft" {{ 'selected' if st=='draft' else '' }}>مسودة</option>
+        <option value="archived" {{ 'selected' if st=='archived' else '' }}>مؤرشف</option>
+      </select>
+      <button class="btn btn-primary btn-lg w-100 mt-4">حفظ المحتوى</button>
+      <a href="{{ url_for('content.index') }}" class="btn btn-outline-secondary w-100 mt-2">رجوع</a>
+    </div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const typeEl=document.getElementById('contentType'), fileBlock=document.getElementById('fileBlock'), contactBlock=document.getElementById('contactBlock');
+function updateBlocks(){const t=typeEl.value;fileBlock.style.display=['photo','document','sticker'].includes(t)?'block':'none';contactBlock.style.display=t==='contact'?'block':'none';}
+typeEl.addEventListener('change',updateBlocks);updateBlocks();
+const ta=document.getElementById('bodyHtml');
+function wrap(open,close){const s=ta.selectionStart,e=ta.selectionEnd,v=ta.value;const selected=v.slice(s,e)||'النص';ta.value=v.slice(0,s)+open+selected+close+v.slice(e);ta.focus();ta.selectionStart=s+open.length;ta.selectionEnd=s+open.length+selected.length;}
+document.querySelectorAll('[data-tag]').forEach(btn=>btn.addEventListener('click',()=>wrap('<'+btn.dataset.tag+'>','</'+btn.dataset.tag+'>')));
+document.getElementById('spoilerBtn').addEventListener('click',()=>wrap('<tg-spoiler>','</tg-spoiler>'));
+document.getElementById('emojiBtn').addEventListener('click',()=>wrap('✨ ',''));
+document.getElementById('linkBtn').addEventListener('click',()=>{const url=prompt('الرابط'); if(url) wrap('<a href="'+url.replaceAll('"','')+'">','</a>');});
+</script>
+{% endblock %}

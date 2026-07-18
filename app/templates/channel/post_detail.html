@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div><span class="eyebrow">إدارة منشور</span><h1>{{ post.title }}</h1><p>راجع المنشور، أرسل تجربة، انشره في القناة، أو اربطه بمنشورات أخرى.</p></div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('channel.dashboard') }}">رجوع للقناة</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <form method="post" class="panel-card p-4">
+      <div class="row g-2 mb-3">
+        <div class="col-md-8"><label class="form-label">العنوان</label><input class="form-control" name="title" value="{{ post.title }}"></div>
+        <div class="col-md-4"><label class="form-label">النوع</label><select class="form-select" name="post_type">{% for k,v in post_types.items() %}<option value="{{ k }}" {{ 'selected' if post.post_type==k else '' }}>{{ v }}</option>{% endfor %}</select></div>
+      </div>
+      <label class="form-label">نص المنشور HTML</label>
+      <textarea class="form-control" name="body_html" rows="16">{{ post.body_html }}</textarea>
+      <button class="btn btn-primary mt-3">حفظ التعديل</button>
+    </form>
+
+    <div class="panel-card p-4 mt-4">
+      <h5>معاينة نصية</h5>
+      <div class="border rounded p-3 bg-light text-break">{{ post.body_html|safe }}</div>
+    </div>
+
+    <div class="panel-card p-4 mt-4">
+      <h5>ربط هذا المنشور بمنشورات منشورة</h5>
+      <form method="post" action="{{ url_for('channel.add_link', post_id=post.id) }}" class="row g-2 align-items-end">
+        <div class="col-md-5"><label class="form-label">المنشور الهدف</label><select class="form-select" name="target_post_id">{% for p in published_posts %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}</select></div>
+        <div class="col-md-5"><label class="form-label">نص الرابط</label><input class="form-control" name="label" placeholder="عرض التفاصيل"></div>
+        <div class="col-md-2"><button class="btn btn-outline-primary w-100">ربط</button></div>
+      </form>
+      <div class="mt-3">
+        {% for l in linked %}
+          <div class="d-flex justify-content-between border-top py-2"><div><strong>{{ l.label or l.target_post.title }}</strong> — <a href="{{ l.target_post.telegram_post_url }}" target="_blank">فتح</a></div><form method="post" action="{{ url_for('channel.delete_link', link_id=l.id) }}"><button class="btn btn-sm btn-outline-danger">حذف</button></form></div>
+        {% else %}<div class="text-muted small">لا توجد روابط داخلية بعد.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="panel-card p-4 mb-4">
+      <h5>الحالة</h5>
+      <p><span class="badge text-bg-secondary">{{ post.status|ar_status }}</span></p>
+      {% if post.telegram_post_url %}<p class="text-break"><a href="{{ post.telegram_post_url }}" target="_blank">{{ post.telegram_post_url }}</a></p>{% endif %}
+      {% if post.last_error %}<div class="alert alert-danger small">{{ post.last_error }}</div>{% endif %}
+      <form method="post" action="{{ url_for('channel.set_index', post_id=post.id) }}"><button class="btn btn-outline-info w-100">اجعله منشور الفهرس</button></form>
+    </div>
+
+    <div class="panel-card p-4 mb-4">
+      <h5>جدولة المنشور</h5>
+      <form method="post" action="{{ url_for('operations.schedule_channel_post', post_id=post.id) }}">
+        <input class="form-control mb-2" type="datetime-local" name="scheduled_at">
+        <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="auto_pin" {{ 'checked' if post.auto_pin else '' }}> تثبيت بعد النشر</label>
+        <button class="btn btn-outline-primary w-100">حفظ الجدولة</button>
+      </form>
+      {% if post.scheduled_at %}<small class="text-muted">مجدول: {{ post.scheduled_at.strftime('%Y-%m-%d %H:%M') }}</small>{% endif %}
+    </div>
+
+    <div class="panel-card p-4 mb-4">
+      <h5>نشر في القناة</h5>
+      <form method="post" action="{{ url_for('channel.publish', post_id=post.id) }}">
+        <label class="form-label">الحساب</label>
+        <select class="form-select mb-2" name="account_id"><option value="">استخدم حساب الإعدادات</option>{% for acc in accounts %}<option value="{{ acc.id }}" {{ 'selected' if settings.publisher_account_id==acc.id else '' }}>{{ acc.display_name or acc.phone_masked or acc.id }}</option>{% endfor %}</select>
+        <label class="form-label">القناة</label><input class="form-control mb-3" name="channel_ref" value="{{ settings.channel_ref or '' }}">
+        <button class="btn btn-primary w-100">نشر الآن</button>
+      </form>
+    </div>
+
+    <div class="panel-card p-4">
+      <h5>إرسال تجربة</h5>
+      <form method="post" action="{{ url_for('channel.test', post_id=post.id) }}">
+        <label class="form-label">الحساب</label>
+        <select class="form-select mb-2" name="account_id">{% for acc in accounts %}<option value="{{ acc.id }}">{{ acc.display_name or acc.phone_masked or acc.id }}</option>{% endfor %}</select>
+        <label class="form-label">قناة / مجموعة الاختبار</label><input class="form-control mb-3" name="channel_ref" placeholder="@test_channel">
+        <button class="btn btn-outline-primary w-100">إرسال تجربة</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">مخطط حملات احترافي</span>
+    <h1>حملة جديدة</h1>
+    <p>اختر الحسابات، ثم حدد هل تريد محتوى موحداً أو محتوى وتوقيتاً مستقلاً لكل حساب.</p>
+  </div>
+  <a class="btn btn-outline-primary" href="{{ url_for('content.create') }}">إنشاء محتوى إعلاني</a>
+</div>
+
+<div class="wizard-steps">
+  <div class="wizard-step active"><span>1</span> نوع المحتوى</div>
+  <div class="wizard-step active"><span>2</span> الحسابات</div>
+  <div class="wizard-step active"><span>3</span> محتوى كل حساب</div>
+  <div class="wizard-step active"><span>4</span> الجدولة</div>
+  <div class="wizard-step active"><span>5</span> مراجعة وتنفيذ</div>
+</div>
+
+<form method="post" class="row g-4" id="campaignForm">
+  <div class="col-xl-8">
+    <div class="panel-card p-4 mb-4">
+      <label class="form-label">اسم الحملة</label>
+      <input class="form-control mb-3" name="name" placeholder="مثال: إعلان الأسبوع">
+
+      <label class="form-label fw-bold">طريقة توزيع المحتوى</label>
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="source-mode-pill d-block h-100">
+            <input class="form-check-input ms-2" type="radio" name="content_strategy" value="uniform" checked>
+            <strong>محتوى موحد لكل الحسابات</strong>
+            <small class="d-block text-muted mt-1">كل الحسابات ترسل نفس المحتوى، مع إمكانية جدولة كل حساب بوقت مختلف.</small>
+          </label>
+        </div>
+        <div class="col-md-6">
+          <label class="source-mode-pill d-block h-100">
+            <input class="form-check-input ms-2" type="radio" name="content_strategy" value="per_account">
+            <strong>محتوى مختلف لكل حساب</strong>
+            <small class="d-block text-muted mt-1">كل حساب يملك نوع محتوى، قالب، مصدر تحويل ووقت مستقل.</small>
+          </label>
+        </div>
+      </div>
+
+      <div id="uniformContentBlock">
+        <label class="form-label fw-bold">نوع مصدر الحملة الموحد</label>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="source-mode-pill d-block h-100">
+              <input class="form-check-input ms-2" type="radio" name="source_mode" value="content" checked>
+              <strong>كتابة / محتوى إعلاني</strong>
+              <small class="d-block text-muted mt-1">يرسل نصاً مباشراً أو محتوى محفوظاً من مكتبة المحتوى.</small>
+            </label>
+          </div>
+          <div class="col-md-6">
+            <label class="source-mode-pill d-block h-100">
+              <input class="form-check-input ms-2" type="radio" name="source_mode" value="forward_last">
+              <strong>تحويل آخر رسالة</strong>
+              <small class="d-block text-muted mt-1">يأخذ آخر رسالة من المصدر المحفوظ ويحوّلها للجروبات.</small>
+            </label>
+          </div>
+        </div>
+
+        <div id="forwardSourceBox" class="mb-3 d-none">
+          <label class="form-label">معرف / يوزر مصدر التحويل</label>
+          <input class="form-control" name="forward_source_ref" value="{{ default_forward_source or '' }}" placeholder="مثال: @source_username أو https://t.me/source_username">
+          <div class="form-text">يُحفظ هذا المصدر تلقائياً لك، ولن تحتاج إدخاله كل مرة إلا إذا أردت تغييره.</div>
+        </div>
+
+        <div class="content-mode-field">
+          <label class="form-label">محتوى محفوظ</label>
+          <select class="form-select mb-3" name="content_item_id" id="contentSelect">
+            <option value="">رسالة مباشرة بدون محتوى محفوظ</option>
+            {% for item in content_items %}
+              <option value="{{ item.id }}" data-text="{{ (item.body_html or item.body_plain or '')|e }}">{{ item.title }} — {{ item.content_type|ar_status }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label">نص بديل أو رسالة مباشرة</label>
+          <textarea class="form-control" name="text" id="campaignText" rows="8" placeholder="اكتب الرسالة هنا أو اختر محتوى محفوظاً..."></textarea>
+        </div>
+        <div class="alert alert-info mt-3 mb-0 forward-mode-field d-none">في وضع التحويل سيتم تجاهل النص والقالب، وسيتم تحويل آخر رسالة من المصدر كما هي قدر الإمكان.</div>
+      </div>
+    </div>
+
+    <div class="panel-card p-4 mb-4">
+      <div class="panel-heading px-0 pt-0 border-0 align-items-start">
+        <div>
+          <h2 class="h5 mb-1">الحسابات وخطة كل حساب</h2>
+          <p class="text-muted small mb-0">اختر الحسابات، ثم عدل محتوى وتوقيت كل حساب عند تفعيل وضع المحتوى المختلف.</p>
+        </div>
+        <button type="button" id="selectAllAccounts" class="btn btn-sm btn-light">تحديد الكل</button>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-md-5">
+          <label class="form-label">المنطقة الزمنية</label>
+          <select class="form-select" name="timezone_name">
+            <option value="Asia/Aden" selected>Asia/Aden — توقيت اليمن</option>
+            <option value="Asia/Riyadh">Asia/Riyadh — توقيت السعودية</option>
+            <option value="Asia/Dubai">Asia/Dubai — توقيت الإمارات</option>
+            <option value="UTC">UTC</option>
+          </select>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label">وقت عام اختياري للحملة — نظام 12 ساعة</label>
+          <div class="time-12-grid">
+            <input class="form-control" type="date" name="scheduled_date">
+            <select class="form-select" name="scheduled_hour">{% for h in range(1,13) %}<option value="{{ h }}">{{ '%02d'|format(h) }}</option>{% endfor %}</select>
+            <select class="form-select" name="scheduled_minute">{% for m in range(0,60,5) %}<option value="{{ m }}">{{ '%02d'|format(m) }}</option>{% endfor %}</select>
+            <select class="form-select" name="scheduled_ampm"><option value="AM">صباحاً</option><option value="PM">مساءً</option></select>
+          </div>
+          <div class="form-text">الحسابات التي تختار لها “وقت الحملة العام” ستستخدم هذا الموعد. إذا تركت التاريخ فارغاً تنشر حالاً.</div>
+        </div>
+      </div>
+
+      <div class="vstack gap-3">
+        {% for a in accounts %}
+          <div class="account-plan-card" data-account-card>
+            <div class="d-flex flex-wrap gap-3 align-items-start justify-content-between mb-3">
+              <label class="form-check d-flex gap-2 align-items-start mb-0">
+                <input class="form-check-input account-checkbox mt-1" type="checkbox" name="account_ids" value="{{ a.id }}">
+                <span>
+                  <strong>{{ a.display_name or a.id }}</strong>
+                  <small class="d-block text-muted">{{ account_group_counts[a.id] }} مجموعة قابلة للنشر</small>
+                </span>
+              </label>
+              <span class="status-pill status-active">حساب نشر</span>
+            </div>
+
+            <div class="planner-grid per-account-content d-none">
+              <div>
+                <label class="form-label small fw-bold">محتوى هذا الحساب</label>
+                <select class="form-select form-select-sm mb-2 account-source-mode" name="account_source_mode_{{ a.id }}">
+                  <option value="content">محتوى محفوظ / نص</option>
+                  <option value="forward_last">تحويل آخر رسالة</option>
+                </select>
+                <select class="form-select form-select-sm mb-2 account-content-select" name="account_content_item_id_{{ a.id }}">
+                  <option value="">بدون محتوى محفوظ</option>
+                  {% for item in content_items %}<option value="{{ item.id }}" data-text="{{ (item.body_html or item.body_plain or '')|e }}">{{ item.title }} — {{ item.content_type|ar_status }}</option>{% endfor %}
+                </select>
+                <textarea class="form-control form-control-sm account-text" name="account_text_{{ a.id }}" rows="3" placeholder="نص خاص بهذا الحساب"></textarea>
+                <input class="form-control form-control-sm account-forward-ref mt-2 d-none" name="account_forward_source_ref_{{ a.id }}" value="{{ default_forward_source or '' }}" placeholder="@source_username">
+              </div>
+              <div>
+                <label class="form-label small fw-bold">توقيت هذا الحساب</label>
+                <select class="form-select form-select-sm timing-mode mb-2" name="timing_mode_{{ a.id }}">
+                  <option value="now">نشر حالاً لهذا الحساب</option>
+                  <option value="campaign">استخدام وقت الحملة العام</option>
+                  <option value="custom">وقت خاص لهذا الحساب</option>
+                </select>
+                <div class="account-schedule-fields d-none">
+                  <div class="time-12-grid">
+                    <input class="form-control form-control-sm" type="date" name="account_schedule_{{ a.id }}_date">
+                    <select class="form-select form-select-sm" name="account_schedule_{{ a.id }}_hour">{% for h in range(1,13) %}<option value="{{ h }}">{{ '%02d'|format(h) }}</option>{% endfor %}</select>
+                    <select class="form-select form-select-sm" name="account_schedule_{{ a.id }}_minute">{% for m in range(0,60,5) %}<option value="{{ m }}">{{ '%02d'|format(m) }}</option>{% endfor %}</select>
+                    <select class="form-select form-select-sm" name="account_schedule_{{ a.id }}_ampm"><option value="AM">ص</option><option value="PM">م</option></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="uniform-account-timing">
+              <label class="form-label small fw-bold">توقيت هذا الحساب</label>
+              <select class="form-select form-select-sm timing-mode" name="timing_mode_{{ a.id }}">
+                <option value="now">نشر حالاً لهذا الحساب</option>
+                <option value="campaign">استخدام وقت الحملة العام</option>
+                <option value="custom">وقت خاص لهذا الحساب</option>
+              </select>
+              <div class="account-schedule-fields d-none mt-2">
+                <div class="time-12-grid">
+                  <input class="form-control form-control-sm" type="date" name="account_schedule_{{ a.id }}_date">
+                  <select class="form-select form-select-sm" name="account_schedule_{{ a.id }}_hour">{% for h in range(1,13) %}<option value="{{ h }}">{{ '%02d'|format(h) }}</option>{% endfor %}</select>
+                  <select class="form-select form-select-sm" name="account_schedule_{{ a.id }}_minute">{% for m in range(0,60,5) %}<option value="{{ m }}">{{ '%02d'|format(m) }}</option>{% endfor %}</select>
+                  <select class="form-select form-select-sm" name="account_schedule_{{ a.id }}_ampm"><option value="AM">صباحاً</option><option value="PM">مساءً</option></select>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="empty-state">لا توجد حسابات نشطة.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="panel-card p-4 sticky-xl-top" style="top: 1rem; z-index: 1;">
+      <h2 class="h5 mb-3">إعدادات التنفيذ</h2>
+      <label class="form-label">حجم الدفعة</label>
+      <input class="form-control" type="number" min="1" max="100" name="batch_size" value="{{ default_batch_size }}">
+      <hr>
+      <label class="form-label">نافذة السماح بالإرسال اختيارياً</label>
+      <div class="row g-2"><div class="col-6"><input class="form-control" name="send_window_start" placeholder="09:00"></div><div class="col-6"><input class="form-control" name="send_window_end" placeholder="21:00"></div></div>
+      <label class="form-label mt-3">التكرار</label>
+      <select class="form-select" name="repeat_rule"><option value="none">بدون تكرار</option><option value="daily">يومي</option><option value="weekly">أسبوعي</option></select>
+      <div class="auto-mode mt-3"><strong>نطاق الحملة:</strong><span>جميع المجموعات المتزامنة تلقائياً للحسابات المختارة</span></div>
+      <div class="alert alert-info small mt-3 mb-0">التوقيت الافتراضي هو توقيت اليمن. المهام المجدولة تحتاج تشغيل <code>python scheduler_worker.py</code>.</div>
+      <button class="btn btn-primary btn-lg w-100 mt-4">إنشاء الحملة</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const selectAllBtn = document.getElementById('selectAllAccounts');
+selectAllBtn?.addEventListener('click', () => { const boxes=[...document.querySelectorAll('.account-checkbox')]; const next=boxes.some(b=>!b.checked); boxes.forEach(b=>{b.checked=next; b.closest('[data-account-card]')?.classList.toggle('is-selected', next);}); });
+document.querySelectorAll('.account-checkbox').forEach(b=>b.addEventListener('change',()=>b.closest('[data-account-card]')?.classList.toggle('is-selected',b.checked)));
+document.getElementById('contentSelect')?.addEventListener('change', e => { const opt=e.target.selectedOptions[0]; const ta=document.getElementById('campaignText'); if(opt?.dataset.text && !ta.value.trim()) ta.value=opt.dataset.text; });
+function syncSourceMode(){ const mode=document.querySelector('input[name="source_mode"]:checked')?.value||'content'; const isForward=mode==='forward_last'; document.getElementById('forwardSourceBox')?.classList.toggle('d-none',!isForward); document.querySelectorAll('.content-mode-field').forEach(el=>el.classList.toggle('d-none',isForward)); document.querySelectorAll('.forward-mode-field').forEach(el=>el.classList.toggle('d-none',!isForward)); }
+document.querySelectorAll('input[name="source_mode"]').forEach(r=>r.addEventListener('change',syncSourceMode)); syncSourceMode();
+function syncStrategy(){ const per=document.querySelector('input[name="content_strategy"]:checked')?.value==='per_account'; document.getElementById('uniformContentBlock')?.classList.toggle('d-none',per); document.getElementById('uniformContentBlock')?.querySelectorAll('input,select,textarea').forEach(el=>{ if(el.name!=='content_strategy') el.disabled=per; }); document.querySelectorAll('.per-account-content').forEach(el=>{ el.classList.toggle('d-none',!per); el.querySelectorAll('input,select,textarea').forEach(x=>x.disabled=!per); }); document.querySelectorAll('.uniform-account-timing').forEach(el=>{ el.classList.toggle('d-none',per); el.querySelectorAll('input,select,textarea').forEach(x=>x.disabled=per); }); }
+document.querySelectorAll('input[name="content_strategy"]').forEach(r=>r.addEventListener('change',syncStrategy)); syncStrategy();
+document.querySelectorAll('.timing-mode').forEach(select=>{ const sync=()=>{ const box=select.closest('.account-plan-card') || select.parentElement; const fields=select.parentElement.querySelector('.account-schedule-fields'); if(fields) fields.classList.toggle('d-none', select.value!=='custom'); }; select.addEventListener('change',sync); sync(); });
+document.querySelectorAll('.account-source-mode').forEach(sel=>{ const sync=()=>{ const area=sel.closest('.per-account-content'); area?.querySelector('.account-content-select')?.classList.toggle('d-none', sel.value==='forward_last'); area?.querySelector('.account-text')?.classList.toggle('d-none', sel.value==='forward_last'); area?.querySelector('.account-forward-ref')?.classList.toggle('d-none', sel.value!=='forward_last'); }; sel.addEventListener('change',sync); sync(); });
+document.querySelectorAll('.account-content-select').forEach(sel=>sel.addEventListener('change',e=>{ const ta=sel.closest('.per-account-content')?.querySelector('.account-text'); const opt=e.target.selectedOptions[0]; if(ta && opt?.dataset.text && !ta.value.trim()) ta.value=opt.dataset.text; }));
+</script>
+{% endblock %}

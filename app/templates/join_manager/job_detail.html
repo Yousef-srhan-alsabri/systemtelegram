@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}تفاصيل مهمة الانضمام{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">مهمة الانضمام #{{ job.id }}</span>
+    <h1>تفاصيل مهمة الانضمام</h1>
+    <p>يعرض هذا السجل نتيجة كل رابط: انضمام، طلب موافقة، منضم مسبقاً، أو فشل مع السبب.</p>
+  </div>
+  <div class="join-action-strip"><a class="btn btn-light" href="{{ url_for('join_manager.index') }}">العودة</a><form method="post" action="{{ url_for('join_manager.job_pause', job_id=job.id) }}"><button class="btn btn-warning">إيقاف مؤقت</button></form><form method="post" action="{{ url_for('join_manager.job_resume', job_id=job.id) }}"><button class="btn btn-success">استئناف</button></form><form method="post" action="{{ url_for('join_manager.job_retry_failed', job_id=job.id) }}"><button class="btn btn-outline-primary">إعادة محاولة الفاشل</button></form><form method="post" action="{{ url_for('join_manager.job_cancel', job_id=job.id) }}" onsubmit="return confirm('تأكيد إلغاء حملة الانضمام؟')"><button class="btn btn-outline-danger">إلغاء</button></form></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>الحالة</span><strong>{{ job.status|ar_status }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>إجمالي الروابط</span><strong>{{ job.total_links }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>تم الانضمام</span><strong>{{ job.joined_count }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>طلبات الموافقة</span><strong>{{ job.request_pending_count }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>الدفعة</span><strong>{{ job.batch_index or 1 }} / {{ job.max_batches or 1 }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>طريقة الاختيار</span><strong>{{ job.selection_mode|ar_status }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>منضم مسبقاً</span><strong>{{ job.already_member_count }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>فشل</span><strong>{{ job.failed_count }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>المتابعة التلقائية</span><strong>{{ 'مفعّلة' if job.auto_continue else 'غير مفعّلة' }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>بدأت</span><strong>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '—' }}</strong></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>انتهت</span><strong>{{ job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '—' }}</strong></div></div>
+</div>
+
+{% if job.stopped_reason %}
+<div class="alert alert-warning">سبب التوقف: {{ job.stopped_reason }}</div>
+{% endif %}
+{% if job.status == 'paused_rate_limit' and job.rate_limited_until %}
+<div class="alert alert-info">المهمة تراقب حد Telegram ديناميكياً، وستستأنف بعد: <strong>{{ job.rate_limited_until.strftime('%Y-%m-%d %H:%M') }}</strong> إذا كان <code>scheduler_worker.py</code> يعمل.</div>
+{% endif %}
+
+<div class="panel-card">
+  <div class="panel-heading">
+    <h2 class="h5 mb-0">سجل الروابط</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>الاسم</th>
+          <th>الرابط</th>
+          <th>النوع</th>
+          <th>حالة الرابط</th>
+          <th>نتيجة التنفيذ</th>
+          <th>الخطأ</th>
+          <th>المصدر</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item, link in items %}
+        <tr>
+          <td>{{ item.id }}</td>
+          <td>{{ link.entity_title or 'غير معروف' }}</td>
+          <td class="text-break"><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.url }}</a></td>
+          <td>
+            <span class="badge text-bg-secondary">{{ (link.entity_type or '—')|ar_status }}</span>
+            {% if link.invite_hash %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
+            {% if link.requires_approval %}<span class="badge text-bg-warning">يتطلب موافقة</span>{% endif %}
+          </td>
+          <td><span class="status-pill status-{{ link.status }}">{{ link.status|ar_status }}</span></td>
+          <td><span class="status-pill status-{{ item.status }}">{{ item.status|ar_status }}</span></td>
+          <td class="small text-danger">{{ item.error_code or link.error_text or '—' }}{% if item.error_text %}<br>{{ item.error_text }}{% endif %}</td>
+          <td>{% if link.source_message_url %}<a href="{{ link.source_message_url }}" target="_blank" rel="noopener">رسالة المصدر</a>{% else %}—{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="empty-state">لا توجد عناصر في هذه المهمة.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

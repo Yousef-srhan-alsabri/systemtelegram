@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div><span class="eyebrow">الاتصالات</span><h1>حسابات تيليجرام</h1><p>أضف الحسابات، حدّث المجموعات، وراقب حالة كل جلسة.</p></div>
+  <button id="addAccount" class="btn btn-primary btn-lg">إضافة حساب</button>
+</div>
+<div id="qrBox" class="panel-card p-4 mb-4 d-none text-center">
+  <h2 class="h5">ربط حساب جديد</h2><div id="qrStatus" class="text-secondary mb-3">جاري التحضير...</div>
+  <img id="qrImage" width="260" class="qr-image d-none mx-auto" alt="رمز QR لتسجيل الدخول">
+</div>
+<div class="row g-3">
+  {% for a in accounts %}
+  <div class="col-md-6 col-xl-4"><div class="account-card h-100">
+    <div class="d-flex justify-content-between align-items-start gap-3"><div><h2 class="h5 mb-1">{{ a.display_name or 'حساب جديد' }}</h2><small>{{ a.phone_masked or 'لم يكتمل الربط' }}</small></div><span data-account-status="{{ a.id }}" class="status-pill status-{{ a.status }}">{{ a.status|ar_status }}</span></div>
+    {% if a.status_reason %}<div class="small text-danger mt-3">{{ a.status_reason }}</div>{% endif %}
+    <div class="account-actions mt-4">
+      <a href="{{ url_for('groups.index',account_id=a.id) }}" class="btn btn-sm btn-light">المجموعات</a>
+      <form method="post" action="{{ url_for('accounts.sync',account_id=a.id) }}"><button class="btn btn-sm btn-outline-success">تحديث تلقائي</button></form>
+      <form method="post" action="{{ url_for('accounts.delete',account_id=a.id) }}" onsubmit="return confirm('حذف الحساب والجلسة؟')"><button class="btn btn-sm btn-outline-danger">حذف</button></form>
+    </div>
+  </div></div>
+  {% else %}<div class="col-12"><div class="empty-card">لم تضف أي حساب بعد.</div></div>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static',filename='js/accounts.js') }}"></script>{% endblock %}

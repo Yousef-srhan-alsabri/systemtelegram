@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}التقارير{% endblock %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">تقارير تشغيلية</span><h1>السجلات والتقارير</h1><p>ملخصات للحسابات والحملات والبحث والانضمام.</p></div><div class="d-flex gap-2"><a class="btn btn-outline-primary" href="{{ url_for('operations.analytics') }}">تحليلات متقدمة</a><a class="btn btn-outline-secondary" href="{{ url_for('operations.account_health') }}">صحة الحسابات</a></div></div>
+<div class="row g-3 mb-4">
+  {% for label,value in [('الحسابات',stats.accounts),('المجموعات',stats.groups),('المهام',stats.tasks),('عمليات البحث',stats.search_jobs),('روابط مكتشفة',stats.discovered_links),('روابط الانضمام',stats.join_links)] %}
+  <div class="col-sm-6 col-xl-2"><div class="metric-card"><div class="metric-label">{{ label }}</div><div class="metric-value fs-2">{{ value }}</div></div></div>
+  {% endfor %}
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-lg-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h6 mb-0">حالات الحسابات</h2></div><div class="p-3">{% for k,v in status_counts.items() %}<div class="d-flex justify-content-between border-bottom py-2"><span><span class="status-pill status-{{ k }}">{{ k|ar_status }}</span></span><b>{{ v }}</b></div>{% else %}<div class="empty-state">لا توجد بيانات.</div>{% endfor %}</div></div></div>
+  <div class="col-lg-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h6 mb-0">حالات المهام</h2></div><div class="p-3">{% for k,v in task_status.items() %}<div class="d-flex justify-content-between border-bottom py-2"><span><span class="status-pill status-{{ k }}">{{ k|ar_status }}</span></span><b>{{ v }}</b></div>{% else %}<div class="empty-state">لا توجد بيانات.</div>{% endfor %}</div></div></div>
+  <div class="col-lg-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h6 mb-0">حالات الانضمام</h2></div><div class="p-3">{% for k,v in join_status.items() %}<div class="d-flex justify-content-between border-bottom py-2"><span><span class="status-pill status-{{ k }}">{{ k|ar_status }}</span></span><b>{{ v }}</b></div>{% else %}<div class="empty-state">لا توجد بيانات.</div>{% endfor %}</div></div></div>
+</div>
+<div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">آخر أخطاء الإرسال والتخطي</h2></div><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>#</th><th>الحالة</th><th>الخطأ</th><th>التفاصيل</th><th>التاريخ</th></tr></thead><tbody>{% for e in latest_errors %}<tr><td>{{ e.id }}</td><td><span class="status-pill status-{{ e.status }}">{{ e.status|ar_status }}</span></td><td>{{ e.error_code or '-' }}</td><td class="text-truncate" style="max-width:420px">{{ e.error_text or '-' }}</td><td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% else %}<tr><td colspan="5" class="empty-state">لا توجد أخطاء مسجلة.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

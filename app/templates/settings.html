@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}الإعدادات{% endblock %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">إعدادات مركزية</span><h1>الإعدادات</h1><p>اضبط الحدود التشغيلية من الواجهة بدلاً من تعديل ملف البيئة في كل مرة.</p></div></div>
+
+{% macro render_setting(s) %}
+  <div>
+    {% if s.type == 'bool' %}
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="{{ s.key }}" name="{{ s.key }}" value="true" {% if s.value|string|lower in ['true','1','yes','on','نعم'] %}checked{% endif %}>
+        <label class="form-check-label" for="{{ s.key }}">{{ s.label }}</label>
+      </div>
+      <small class="text-muted d-block mt-1">{{ s.key }}</small>
+    {% else %}
+      <label class="form-label">{{ s.label }}</label>
+      <input class="form-control" name="{{ s.key }}" value="{{ s.value }}" inputmode="numeric">
+      <small class="text-muted">{{ s.key }}</small>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+<form method="post" class="row g-3">
+  <div class="col-xl-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h5 mb-0">تيليجرام والحملات</h2></div><div class="p-3 vstack gap-3">{% for s in groups.telegram %}{{ render_setting(s) }}{% endfor %}</div></div></div>
+  <div class="col-xl-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h5 mb-0">البحث والاستكشاف</h2></div><div class="p-3 vstack gap-3">{% for s in groups.search %}{{ render_setting(s) }}{% endfor %}</div></div></div>
+  <div class="col-xl-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h5 mb-0">مدير الانضمام</h2></div><div class="p-3 vstack gap-3">{% for s in groups.join %}{{ render_setting(s) }}{% endfor %}</div></div></div>
+  <div class="col-12"><div class="panel-card p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"><div><b>ملاحظة تشغيلية</b><div class="text-muted small">الأسرار مثل TELEGRAM_API_HASH وSESSION_ENCRYPTION_KEYS تبقى في ملف .env ولا تُدار من الواجهة. إعدادات الانضمام هنا تُطبّق على المهام الجديدة فقط.</div></div><button class="btn btn-primary btn-lg">حفظ الإعدادات</button></div></div>
+</form>
+{% endblock %}

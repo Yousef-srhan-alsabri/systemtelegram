@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">معاينة المحتوى</span><h1>{{ item.title }}</h1><p>راجع المحتوى ثم أرسل اختباراً إلى قناة قبل استخدامه في حملة.</p></div><a class="btn btn-outline-secondary" href="{{ url_for('content.edit', item_id=item.id) }}">تعديل</a></div>
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="panel-card p-4">
+      <div class="mb-3"><span class="badge text-bg-info">{{ item.content_type|ar_status }}</span> <span class="badge text-bg-secondary">{{ item.status|ar_status }}</span></div>
+      {% if item.media %}<div class="alert alert-light border">ملف مرفق: <strong>{{ item.media.original_filename }}</strong> — {{ item.media.media_type|ar_status }}</div>{% endif %}
+      {% if item.content_type == 'contact' %}<div class="contact-preview border rounded p-3 mb-3"><strong>👤 {{ item.contact_first_name }} {{ item.contact_last_name or '' }}</strong><div>📞 {{ item.contact_phone }}</div></div>{% endif %}
+      <div class="telegram-preview border rounded p-3 bg-light" dir="rtl">{{ item.body_html|safe if item.body_html else '—' }}</div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel-card p-4">
+      <h2 class="h5">إرسال اختبار</h2>
+      <form method="post" action="{{ url_for('content.test_send', item_id=item.id) }}">
+        <label class="form-label">حساب الإرسال</label>
+        <select class="form-select mb-3" name="account_id" required>{% for a in accounts %}<option value="{{ a.id }}">{{ a.display_name or a.id }}</option>{% endfor %}</select>
+        <label class="form-label">قناة الاختبار</label>
+        <input class="form-control mb-3" name="channel_ref" placeholder="https://t.me/my_channel أو @my_channel" value="{{ export_channels[0].channel_ref if export_channels else '' }}" required>
+        <button class="btn btn-primary w-100">إرسال تجربة</button>
+      </form>
+      <a class="btn btn-outline-primary w-100 mt-2" href="{{ url_for('messages.create') }}">استخدام في حملة</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

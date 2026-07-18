@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div><span class="eyebrow">إدارة قناة Telegram</span><h1>إعدادات ومنشورات القناة</h1><p>أنشئ قوالب ومنشورات منظمة، احفظ روابط المنشورات بعد النشر، وحدّث فهرس القناة تلقائياً.</p></div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('channel.settings') }}">إعدادات القناة</a>
+    <a class="btn btn-primary" href="{{ url_for('channel.create_post') }}">منشور جديد</a>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-4">
+    <div class="panel-card p-4 h-100">
+      <h5>القناة</h5>
+      <div class="text-muted small mb-2">رابط القناة</div>
+      <div class="fw-semibold">{{ settings.channel_ref or 'لم يتم ضبط القناة بعد' }}</div>
+      <hr>
+      <div class="text-muted small mb-2">حساب النشر</div>
+      <div>{{ settings.publisher_account.display_name if settings.publisher_account else 'غير محدد' }}</div>
+      <a class="btn btn-sm btn-outline-primary mt-3" href="{{ url_for('channel.settings') }}">تعديل الإعدادات</a>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel-card p-4 h-100">
+      <h5>الفهرس الرئيسي</h5>
+      {% if settings.index_post_id %}
+        {% set idx = settings.index_post_id %}
+        <div class="text-success">تم تحديد منشور فهرس.</div>
+        <form method="post" action="{{ url_for('channel.update_index') }}" class="mt-3"><button class="btn btn-primary btn-sm">تحديث منشور الفهرس</button></form>
+      {% else %}
+        <div class="text-muted">لم يتم تحديد منشور فهرس. أنشئ منشوراً من نوع فهرس ثم اجعله الفهرس الرئيسي.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel-card p-4 h-100">
+      <h5>القوالب الجاهزة</h5>
+      <div class="display-6">{{ templates|length }}</div>
+      <div class="text-muted">فرصة، خدمة، تعليمي، تذكير، ترحيبي، فهرس.</div>
+      <a class="btn btn-sm btn-outline-secondary mt-3" href="{{ url_for('channel.create_post') }}">استخدام قالب</a>
+    </div>
+  </div>
+</div>
+
+<div class="panel-card p-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="m-0">آخر منشورات القناة</h5>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('channel.create_post') }}">منشور جديد</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>العنوان</th><th>النوع</th><th>الحالة</th><th>رابط Telegram</th><th>آخر تحديث</th><th></th></tr></thead>
+      <tbody>
+        {% for post in posts %}
+        <tr>
+          <td><strong>{{ post.title }}</strong><div class="text-muted small">{{ (post.body_html|striptags)[:95] }}</div></td>
+          <td><span class="badge text-bg-info">{{ post_types.get(post.post_type, post.post_type) }}</span></td>
+          <td><span class="badge text-bg-secondary">{{ post.status|ar_status }}</span></td>
+          <td>{% if post.telegram_post_url %}<a href="{{ post.telegram_post_url }}" target="_blank">فتح المنشور</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="small text-muted">{{ post.updated_at.strftime('%Y-%m-%d %H:%M') if post.updated_at else '—' }}</td>
+          <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('channel.post_detail', post_id=post.id) }}">إدارة</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6"><div class="empty-state">لا توجد منشورات بعد.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

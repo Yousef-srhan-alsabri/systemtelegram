@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}التحليلات{% endblock %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">Analytics</span><h1>التحليلات والتقارير</h1><p>تفصيل حالات الرسائل والانضمام والبحث وأعلى الأخطاء.</p></div><a class="btn btn-outline-primary" href="{{ url_for('operations.export_messages_csv') }}">تصدير CSV</a></div>
+<div class="row g-3 mb-4">
+  <div class="col-lg-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h6 mb-0">حالات الرسائل</h2></div><div class="p-3">{% for k,v in by_status.items() %}<div class="d-flex justify-content-between border-bottom py-2"><span class="status-pill status-{{ k }}">{{ k|ar_status }}</span><b>{{ v }}</b></div>{% else %}<div class="empty-state">لا توجد بيانات.</div>{% endfor %}</div></div></div>
+  <div class="col-lg-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h6 mb-0">حالات الانضمام</h2></div><div class="p-3">{% for k,v in join_by_status.items() %}<div class="d-flex justify-content-between border-bottom py-2"><span class="status-pill status-{{ k }}">{{ k|ar_status }}</span><b>{{ v }}</b></div>{% else %}<div class="empty-state">لا توجد بيانات.</div>{% endfor %}</div></div></div>
+  <div class="col-lg-4"><div class="panel-card h-100"><div class="panel-heading"><h2 class="h6 mb-0">حالات البحث</h2></div><div class="p-3">{% for k,v in search_by_status.items() %}<div class="d-flex justify-content-between border-bottom py-2"><span class="status-pill status-{{ k }}">{{ k|ar_status }}</span><b>{{ v }}</b></div>{% else %}<div class="empty-state">لا توجد بيانات.</div>{% endfor %}</div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-5"><div class="panel-card"><div class="panel-heading"><h2 class="h6 mb-0">أعلى الأخطاء</h2></div><div class="p-3">{% for code,count in by_error %}<div class="d-flex justify-content-between border-bottom py-2"><code>{{ code }}</code><b>{{ count }}</b></div>{% else %}<div class="empty-state">لا توجد أخطاء.</div>{% endfor %}</div></div></div>
+  <div class="col-lg-7"><div class="panel-card"><div class="panel-heading"><h2 class="h6 mb-0">آخر المهام</h2></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>#</th><th>الحالة</th><th>إجمالي</th><th>أُرسل</th><th>فشل</th><th>تاريخ</th></tr></thead><tbody>{% for t in top_tasks %}<tr><td>{{ t.id }}</td><td><span class="status-pill status-{{ t.status }}">{{ t.status|ar_status }}</span></td><td>{{ t.total_groups }}</td><td>{{ t.sent_count }}</td><td>{{ t.failed_count }}</td><td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% else %}<tr><td colspan="6" class="empty-state">لا توجد مهام.</td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+{% endblock %}

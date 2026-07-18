@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}التشغيل والإنتاج{% endblock %}
+{% block content %}
+<div class="page-header"><div><span class="eyebrow">v6.4 Full Suite</span><h1>التشغيل والإنتاج</h1><p>مركز موحد للتحليلات، صحة الحسابات، الجدولة، النسخ الاحتياطي والتصدير.</p></div></div>
+<div class="row g-3 mb-4">
+  {% for label,value in [('الحسابات',summary.accounts),('الحملات',summary.campaigns),('المهام',summary.tasks),('تم الإرسال',summary.sent),('فشل',summary.failed),('نسبة النجاح %',summary.success_rate),('حملات مجدولة',summary.scheduled_campaigns),('منشورات مجدولة',summary.scheduled_posts)] %}
+  <div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-label">{{ label }}</div><div class="metric-value fs-3">{{ value }}</div></div></div>
+  {% endfor %}
+</div>
+<div class="row g-3">
+  <div class="col-md-6 col-xl-3"><a class="panel-card action-card" href="{{ url_for('operations.account_health') }}"><b>صحة الحسابات</b><span>قياس المخاطر، الأخطاء، FloodWait والمجموعات.</span></a></div>
+  <div class="col-md-6 col-xl-3"><a class="panel-card action-card" href="{{ url_for('operations.analytics') }}"><b>التحليلات والتقارير</b><span>تجميع الحالات والأخطاء وأداء المهام.</span></a></div>
+  <div class="col-md-6 col-xl-3"><a class="panel-card action-card" href="{{ url_for('operations.scheduler') }}"><b>الجدولة والتقويم</b><span>الحملات والمنشورات المجدولة وتشغيل المستحق.</span></a></div>
+  <div class="col-md-6 col-xl-3"><a class="panel-card action-card" href="{{ url_for('operations.backups') }}"><b>النسخ الاحتياطي</b><span>إنشاء وتحميل نسخة من قاعدة البيانات والوسائط.</span></a></div>
+</div>
+<div class="panel-card p-4 mt-4"><h2 class="h5">جاهزية الإنتاج</h2><p class="text-muted mb-2">هذه النسخة تحتوي Dockerfile و docker-compose و PostgreSQL/Redis في ملفات النشر، مع مركز نسخ احتياطي وHealth Check داخلي. عند الانتقال للإنتاج، استخدم PostgreSQL وتخزين دائم للوسائط ولا ترفع ملف .env إلى Git.</p><a class="btn btn-outline-primary" href="{{ url_for('operations.export_messages_csv') }}">تصدير سجلات الرسائل CSV</a></div>
+{% endblock %}
