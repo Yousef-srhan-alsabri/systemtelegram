@@ -5,28 +5,37 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}مركز إدارة تيليجرام{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static',filename='css/app.css') }}">
 </head>
-<body>
+<body class="app-body">
 {% if current_user.is_authenticated %}
 <div class="layout">
   <aside class="sidebar">
-    <a class="brand" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">T</span><span>مركز تيليجرام</span></a>
-    <div class="role-chip mb-3">{{ current_user.role_label }}</div>
+    <div class="sidebar-top">
+      <a class="brand" href="{{ url_for('main.dashboard') }}">
+        <span class="brand-mark"><i class="bi bi-telegram"></i></span>
+        <span>
+          <strong>مركز تيليجرام</strong>
+          <small>Control Hub</small>
+        </span>
+      </a>
+      <div class="role-chip mb-3">{{ current_user.role_label }}</div>
+    </div>
     <nav class="side-nav">
-      <a href="{{ url_for('main.dashboard') }}">لوحة التحكم</a>
-      {% if current_user.has_permission('telegram.accounts') %}<a href="{{ url_for('accounts.index') }}">حسابات تيليجرام</a>{% endif %}
-      {% if current_user.has_permission('campaigns.manage') %}<a href="{{ url_for('messages.create') }}">الحملات والمهام</a>{% endif %}
-      {% if current_user.has_permission('content.manage') %}<a href="{{ url_for('content.index') }}">المحتوى الإعلاني</a>{% endif %}
-      {% if current_user.has_permission('channel.manage') %}<a href="{{ url_for('channel.dashboard') }}">إدارة القناة</a>{% endif %}
-      {% if current_user.has_permission('search.manage') %}<a href="{{ url_for('search.index') }}">البحث والاستكشاف</a>{% endif %}
-      {% if current_user.has_permission('join.manage') %}<a href="{{ url_for('join_manager.index') }}">مدير الانضمام</a>{% endif %}
-      {% if current_user.has_permission('links.manage') %}<a href="{{ url_for('links.index') }}">مدير الروابط</a>{% endif %}
-      {% if current_user.has_permission('reports.view') %}<a href="{{ url_for('reports.index') }}">السجلات والتقارير</a>{% endif %}
-      {% if current_user.has_permission('operations.manage') %}<a href="{{ url_for('operations.index') }}">التشغيل والإنتاج</a>{% endif %}
-      {% if current_user.has_permission('settings.manage') %}<a href="{{ url_for('settings.index') }}">الإعدادات</a>{% endif %}
-      {% if current_user.has_permission('audit.view') %}<a href="{{ url_for('activity.index') }}">سجل التدقيق</a>{% endif %}
-      {% if current_user.has_permission('users.manage') %}<a href="{{ url_for('admin.users') }}">المستخدمون والصلاحيات</a>{% endif %}
+      <a href="{{ url_for('main.dashboard') }}"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></a>
+      {% if current_user.has_permission('telegram.accounts') %}<a href="{{ url_for('accounts.index') }}"><i class="bi bi-people"></i><span>حسابات تيليجرام</span></a>{% endif %}
+      {% if current_user.has_permission('campaigns.manage') %}<a href="{{ url_for('messages.create') }}"><i class="bi bi-megaphone"></i><span>الحملات والمهام</span></a>{% endif %}
+      {% if current_user.has_permission('content.manage') %}<a href="{{ url_for('content.index') }}"><i class="bi bi-card-text"></i><span>المحتوى الإعلاني</span></a>{% endif %}
+      {% if current_user.has_permission('channel.manage') %}<a href="{{ url_for('channel.dashboard') }}"><i class="bi bi-broadcast"></i><span>إدارة القناة</span></a>{% endif %}
+      {% if current_user.has_permission('search.manage') %}<a href="{{ url_for('search.index') }}"><i class="bi bi-search"></i><span>البحث والاستكشاف</span></a>{% endif %}
+      {% if current_user.has_permission('join.manage') %}<a href="{{ url_for('join_manager.index') }}"><i class="bi bi-person-plus"></i><span>مدير الانضمام</span></a>{% endif %}
+      {% if current_user.has_permission('links.manage') %}<a href="{{ url_for('links.index') }}"><i class="bi bi-link-45deg"></i><span>مدير الروابط</span></a>{% endif %}
+      {% if current_user.has_permission('reports.view') %}<a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i><span>السجلات والتقارير</span></a>{% endif %}
+      {% if current_user.has_permission('operations.manage') %}<a href="{{ url_for('operations.index') }}"><i class="bi bi-gear-wide-connected"></i><span>التشغيل والإنتاج</span></a>{% endif %}
+      {% if current_user.has_permission('settings.manage') %}<a href="{{ url_for('settings.index') }}"><i class="bi bi-sliders"></i><span>الإعدادات</span></a>{% endif %}
+      {% if current_user.has_permission('audit.view') %}<a href="{{ url_for('activity.index') }}"><i class="bi bi-journal-text"></i><span>سجل التدقيق</span></a>{% endif %}
+      {% if current_user.has_permission('users.manage') %}<a href="{{ url_for('admin.users') }}"><i class="bi bi-shield-lock"></i><span>المستخدمون والصلاحيات</span></a>{% endif %}
     </nav>
   </aside>
   <div class="main-area">
@@ -36,6 +45,7 @@
         <small>إدارة الحسابات، البحث، الانضمام، الحملات والتقارير</small>
       </div>
       <div class="topbar-actions d-flex align-items-center gap-2">
+        <span class="status-dot"></span>
         <span class="user-chip-dark">{{ current_user.email }}</span>
         <form method="post" action="{{ url_for('auth.logout') }}">
           <button class="btn btn-outline-secondary btn-sm">خروج</button>
