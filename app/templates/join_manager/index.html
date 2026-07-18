@@ -35,8 +35,8 @@
           </select>
           <small class="text-muted d-block mt-1">يمكنك تحديد أكثر من حساب بالضغط على Ctrl. كل حساب ينفذ دفعته الخاصة.</small>
           <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectJoinAccounts('all')">تحديد كل الحسابات</button>
-            <button type="button" class="btn btn-sm btn-outline-dark" onclick="selectJoinAccounts('none')">إلغاء الحسابات</button>
+            <button type="button" id="selectAllAccountsBtn" class="btn btn-sm btn-outline-primary">تحديد كل الحسابات</button>
+            <button type="button" id="clearAccountsBtn" class="btn btn-sm btn-outline-dark">إلغاء الحسابات</button>
           </div>
         </div>
         <div class="col-lg-5">
@@ -53,17 +53,17 @@
           <small class="text-muted d-block">{% if continue_batches %}سيستمر تلقائياً للدفعات التالية حتى {{ max_batches }} دفعات، مع انتظار {{ batch_pause_seconds }} ثانية بين كل دفعة.{% else %}لن ينتقل تلقائياً للدفعة التالية حالياً.{% endif %}</small>
         </div>
         <div class="col-lg-3 d-grid">
-          <button class="btn btn-success" onclick="return confirmJoinMode()">بدء الانضمام</button>
+          <button type="submit" class="btn btn-success">بدء الانضمام</button>
         </div>
       </div>
 
       <div class="d-flex flex-wrap gap-2 mt-3">
-        <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectJoinLinks('all')">تحديد كل الصالح</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectJoinLinks('groups')">تحديد الجروبات</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectJoinLinks('channels')">تحديد القنوات</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectJoinLinks('invites')">تحديد الدعوات</button>
-        <button type="button" class="btn btn-sm btn-outline-warning" onclick="selectJoinLinks('approval')">تحديد طلبات الموافقة</button>
-        <button type="button" class="btn btn-sm btn-outline-dark" onclick="selectJoinLinks('none')">إلغاء التحديد</button>
+        <button type="button" id="selectAllLinksBtn" class="btn btn-sm btn-outline-primary">تحديد كل الصالح</button>
+        <button type="button" id="selectGroupsBtn" class="btn btn-sm btn-outline-secondary">تحديد الجروبات</button>
+        <button type="button" id="selectChannelsBtn" class="btn btn-sm btn-outline-secondary">تحديد القنوات</button>
+        <button type="button" id="selectInvitesBtn" class="btn btn-sm btn-outline-secondary">تحديد الدعوات</button>
+        <button type="button" id="selectApprovalBtn" class="btn btn-sm btn-outline-warning">تحديد طلبات الموافقة</button>
+        <button type="button" id="clearLinksBtn" class="btn btn-sm btn-outline-dark">إلغاء التحديد</button>
       </div>
     </div>
 
@@ -134,22 +134,18 @@ function selectJoinLinks(mode) {
     const type = box.dataset.type;
     const invite = box.dataset.invite === '1';
     const approval = box.dataset.approval === '1';
-    box.checked = (
-      mode === 'all' ||
+    box.checked = mode === 'all' ||
       (mode === 'groups' && type === 'group') ||
       (mode === 'channels' && type === 'channel') ||
       (mode === 'invites' && invite) ||
-      (mode === 'approval' && approval)
-    );
+      (mode === 'approval' && approval);
     if (mode === 'none') box.checked = false;
   }
-}
 
-const toggleAllJoinLinks = document.getElementById('toggleAllJoinLinks');
-if (toggleAllJoinLinks) {
-  toggleAllJoinLinks.addEventListener('change', function () {
-    selectJoinLinks(this.checked ? 'all' : 'none');
-  });
+  const toggleAll = document.getElementById('toggleAllJoinLinks');
+  if (toggleAll) {
+    toggleAll.checked = mode === 'all';
+  }
 }
 
 function selectJoinAccounts(mode) {
@@ -182,6 +178,75 @@ function confirmJoinMode() {
   }
   return confirm('تأكيد بدء مهمة الانضمام على ' + accountsCount + ' حساب/حسابات حسب الخيار المحدد؟');
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('joinExecuteForm');
+  const toggleAllJoinLinks = document.getElementById('toggleAllJoinLinks');
+  const selectAllAccountsBtn = document.getElementById('selectAllAccountsBtn');
+  const clearAccountsBtn = document.getElementById('clearAccountsBtn');
+  const selectAllLinksBtn = document.getElementById('selectAllLinksBtn');
+  const selectGroupsBtn = document.getElementById('selectGroupsBtn');
+  const selectChannelsBtn = document.getElementById('selectChannelsBtn');
+  const selectInvitesBtn = document.getElementById('selectInvitesBtn');
+  const selectApprovalBtn = document.getElementById('selectApprovalBtn');
+  const clearLinksBtn = document.getElementById('clearLinksBtn');
+
+  if (toggleAllJoinLinks) {
+    toggleAllJoinLinks.addEventListener('change', function () {
+      selectJoinLinks(this.checked ? 'all' : 'none');
+    });
+  }
+
+  if (selectAllAccountsBtn) {
+    selectAllAccountsBtn.addEventListener('click', function () {
+      selectJoinAccounts('all');
+    });
+  }
+  if (clearAccountsBtn) {
+    clearAccountsBtn.addEventListener('click', function () {
+      selectJoinAccounts('none');
+    });
+  }
+  if (selectAllLinksBtn) {
+    selectAllLinksBtn.addEventListener('click', function () {
+      selectJoinLinks('all');
+    });
+  }
+  if (selectGroupsBtn) {
+    selectGroupsBtn.addEventListener('click', function () {
+      selectJoinLinks('groups');
+    });
+  }
+  if (selectChannelsBtn) {
+    selectChannelsBtn.addEventListener('click', function () {
+      selectJoinLinks('channels');
+    });
+  }
+  if (selectInvitesBtn) {
+    selectInvitesBtn.addEventListener('click', function () {
+      selectJoinLinks('invites');
+    });
+  }
+  if (selectApprovalBtn) {
+    selectApprovalBtn.addEventListener('click', function () {
+      selectJoinLinks('approval');
+    });
+  }
+  if (clearLinksBtn) {
+    clearLinksBtn.addEventListener('click', function () {
+      selectJoinLinks('none');
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', function (event) {
+      const ok = confirmJoinMode();
+      if (!ok) {
+        event.preventDefault();
+      }
+    });
+  }
+});
 </script>
 <div class="row g-4"><div class="col-xl-6"><div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">عمليات الفحص</h2></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>#</th><th>الحالة</th><th>رسائل</th><th>روابط جديدة</th><th>الخطأ</th></tr></thead><tbody>{% for s in scans %}<tr><td>{{ s.id }}</td><td><span class="status-pill status-{{ s.status }}">{{ s.status|ar_status }}</span></td><td>{{ s.messages_scanned }}</td><td>{{ s.unique_links }}</td><td class="small text-danger">{{ s.error_text or "—" }}</td></tr>{% else %}<tr><td colspan="5" class="empty-state">لا توجد عمليات.</td></tr>{% endfor %}</tbody></table></div></div></div><div class="col-xl-6"><div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">مهام الانضمام</h2></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>#</th><th>الحساب</th><th>الحالة</th><th>الدفعة</th><th>الوضع</th><th>الكل</th><th>انضم</th><th>طلبات</th><th>فشل</th><th>التفاصيل</th></tr></thead><tbody>{% for j in jobs %}<tr><td>{{ j.id }}</td><td>{{ j.account_id }}</td><td><span class="status-pill status-{{ j.status }}">{{ j.status|ar_status }}</span></td><td>{{ j.batch_index or 1 }} / {{ j.max_batches or 1 }}</td><td>{{ j.selection_mode|ar_status }}{% if j.auto_continue %}<span class="badge text-bg-info d-block mt-1">متابعة تلقائية</span>{% endif %}</td><td>{{ j.total_links }}</td><td>{{ j.joined_count }}</td><td>{{ j.request_pending_count }}</td><td>{{ j.failed_count }}</td><td><a class="btn btn-sm btn-light" href="{{ url_for('join_manager.job_detail', job_id=j.id) }}">عرض</a></td></tr>{% else %}<tr><td colspan="10" class="empty-state">لا توجد مهام.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
 {% endblock %}
