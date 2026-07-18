@@ -11,7 +11,7 @@
 <body class="app-body">
 {% if current_user.is_authenticated %}
 <div class="layout">
-  <aside class="sidebar">
+  <aside class="sidebar d-none d-lg-flex">
     <div class="sidebar-top">
       <a class="brand" href="{{ url_for('main.dashboard') }}">
         <span class="brand-mark"><i class="bi bi-telegram"></i></span>
@@ -38,11 +38,47 @@
       {% if current_user.has_permission('users.manage') %}<a href="{{ url_for('admin.users') }}"><i class="bi bi-shield-lock"></i><span>المستخدمون والصلاحيات</span></a>{% endif %}
     </nav>
   </aside>
+
+  <div class="offcanvas offcanvas-start mobile-sidebar" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+    <div class="offcanvas-header">
+      <div class="brand mb-0">
+        <span class="brand-mark"><i class="bi bi-telegram"></i></span>
+        <span>
+          <strong>مركز تيليجرام</strong>
+          <small>Control Hub</small>
+        </span>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div class="role-chip mb-3">{{ current_user.role_label }}</div>
+      <nav class="side-nav">
+        <a href="{{ url_for('main.dashboard') }}"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></a>
+        {% if current_user.has_permission('telegram.accounts') %}<a href="{{ url_for('accounts.index') }}"><i class="bi bi-people"></i><span>حسابات تيليجرام</span></a>{% endif %}
+        {% if current_user.has_permission('campaigns.manage') %}<a href="{{ url_for('messages.create') }}"><i class="bi bi-megaphone"></i><span>الحملات والمهام</span></a>{% endif %}
+        {% if current_user.has_permission('content.manage') %}<a href="{{ url_for('content.index') }}"><i class="bi bi-card-text"></i><span>المحتوى الإعلاني</span></a>{% endif %}
+        {% if current_user.has_permission('channel.manage') %}<a href="{{ url_for('channel.dashboard') }}"><i class="bi bi-broadcast"></i><span>إدارة القناة</span></a>{% endif %}
+        {% if current_user.has_permission('search.manage') %}<a href="{{ url_for('search.index') }}"><i class="bi bi-search"></i><span>البحث والاستكشاف</span></a>{% endif %}
+        {% if current_user.has_permission('join.manage') %}<a href="{{ url_for('join_manager.index') }}"><i class="bi bi-person-plus"></i><span>مدير الانضمام</span></a>{% endif %}
+        {% if current_user.has_permission('links.manage') %}<a href="{{ url_for('links.index') }}"><i class="bi bi-link-45deg"></i><span>مدير الروابط</span></a>{% endif %}
+        {% if current_user.has_permission('reports.view') %}<a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i><span>السجلات والتقارير</span></a>{% endif %}
+        {% if current_user.has_permission('operations.manage') %}<a href="{{ url_for('operations.index') }}"><i class="bi bi-gear-wide-connected"></i><span>التشغيل والإنتاج</span></a>{% endif %}
+        {% if current_user.has_permission('settings.manage') %}<a href="{{ url_for('settings.index') }}"><i class="bi bi-sliders"></i><span>الإعدادات</span></a>{% endif %}
+        {% if current_user.has_permission('audit.view') %}<a href="{{ url_for('activity.index') }}"><i class="bi bi-journal-text"></i><span>سجل التدقيق</span></a>{% endif %}
+        {% if current_user.has_permission('users.manage') %}<a href="{{ url_for('admin.users') }}"><i class="bi bi-shield-lock"></i><span>المستخدمون والصلاحيات</span></a>{% endif %}
+      </nav>
+    </div>
+  </div>
   <div class="main-area">
     <header class="topbar">
-      <div>
-        <div class="topbar-title">لوحة تشغيل موحدة</div>
-        <small>إدارة الحسابات، البحث، الانضمام، الحملات والتقارير</small>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary btn-sm mobile-menu-toggle d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="فتح قائمة التنقل">
+          <i class="bi bi-list"></i>
+        </button>
+        <div>
+          <div class="topbar-title">لوحة تشغيل موحدة</div>
+          <small>إدارة الحسابات، البحث، الانضمام، الحملات والتقارير</small>
+        </div>
       </div>
       <div class="topbar-actions d-flex align-items-center gap-2">
         <span class="status-dot"></span>
