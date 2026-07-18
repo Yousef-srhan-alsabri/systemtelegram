@@ -1,9 +1,30 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="page-header">
-  <div><span class="eyebrow">نظرة عامة</span><h1>لوحة التحكم</h1><p>مركز تشغيل سريع لكل وحدات الموقع.</p></div>
-  <div class="d-flex gap-2 flex-wrap"><a href="{{ url_for('search.index') }}" class="btn btn-outline-primary">بحث جديد</a><a href="{{ url_for('messages.create') }}" class="btn btn-primary">إنشاء حملة</a></div>
+  <div>
+    <span class="eyebrow">نظرة عامة</span>
+    <h1>لوحة التحكم</h1>
+    <p>مركز تشغيل سريع لكل وحدات الموقع.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('search.index') }}" class="btn btn-outline-primary">بحث جديد</a>
+    <a href="{{ url_for('messages.create') }}" class="btn btn-primary">إنشاء حملة</a>
+  </div>
 </div>
+
+<div class="hero-panel mb-4">
+  <div>
+    <span class="eyebrow">مركز التشغيل</span>
+    <h2 class="mb-2">واجهة مراقبة احترافية ومرنة</h2>
+    <p class="mb-0">تابع الحسابات، الحملات، والمهام التشغيلية من شاشة واحدة بصياغة واضحة وسريعة.</p>
+  </div>
+  <div class="hero-badges">
+    <span>إدارة كاملة</span>
+    <span>استجابة ممتازة</span>
+    <span>تصميم حديث</span>
+  </div>
+</div>
+
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-label">الحسابات النشطة</div><div class="metric-value">{{ stats.active_accounts }}</div><small>من أصل {{ stats.accounts }} حساب</small></div></div>
   <div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-label">المجموعات</div><div class="metric-value">{{ stats.groups }}</div><small>مجموعات متزامنة</small></div></div>
