@@ -17,6 +17,12 @@ PERMISSION_SPECS = [
 
 PERMISSION_LABELS = {key: label for key, label, _ in PERMISSION_SPECS}
 ALL_PERMISSIONS = [key for key, _, _ in PERMISSION_SPECS]
+PERMISSION_SPECS.insert(
+    10,
+    ("whatsapp.extract", "استخراج روابط واتساب", "استخراج روابط واتساب من القروبات والقنوات وتصديرها إلى PDF أو قناة"),
+)
+PERMISSION_LABELS["whatsapp.extract"] = "استخراج روابط واتساب"
+ALL_PERMISSIONS.insert(10, "whatsapp.extract")
 
 ROLE_LABELS = {
     "super_admin": "مدير عام",
@@ -35,6 +41,7 @@ ROLE_DEFAULTS = {
         "channel.manage",
         "search.manage",
         "join.manage",
+        "whatsapp.extract",
         "links.manage",
         "reports.view",
     ],
@@ -50,6 +57,7 @@ BLUEPRINT_PERMISSIONS = {
     "channel": "channel.manage",
     "search": "search.manage",
     "join_manager": "join.manage",
+    "whatsapp": "whatsapp.extract",
     "links": "links.manage",
     "reports": "reports.view",
     "settings": "settings.manage",

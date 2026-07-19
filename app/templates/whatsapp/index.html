@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block title %}استخراج روابط واتساب{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">WhatsApp Extractor</span>
+    <h1>استخراج روابط واتساب</h1>
+    <p>يفحص القروبات والقنوات داخل الحسابات النشطة، يستثني قنوات الانضمام والتصدير، ثم يحفظ روابط واتساب في PDF أو يرسلها إلى قناة.</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-5">
+    <form method="post" class="panel-card p-4">
+      <h2 class="h5 mb-3">عملية استخراج جديدة</h2>
+
+      <label class="form-label">الحسابات</label>
+      <div class="account-selector mb-3">
+        {% for a in accounts %}
+          <label class="account-option">
+            <input class="form-check-input whatsapp-account-checkbox" type="checkbox" name="account_ids" value="{{ a.id }}">
+            <span><strong>{{ a.display_name or a.phone_masked or ('حساب ' ~ a.id) }}</strong><small>{{ a.phone_masked or 'نشط' }}</small></span>
+          </label>
+        {% else %}
+          <div class="empty-state">أضف حساب Telegram نشطاً أولاً.</div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="selectAllWhatsappAccounts">تحديد كل الحسابات</button>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">النطاق</label>
+          <select class="form-select" name="scope">
+            <option value="groups_channels">القروبات والقنوات</option>
+            <option value="groups">القروبات فقط</option>
+            <option value="channels">القنوات فقط</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">من تاريخ</label>
+          <input class="form-control" type="date" name="start_date">
+        </div>
+      </div>
+
+      <hr class="my-4">
+      <label class="form-label">طريقة التصدير</label>
+      <div class="vstack gap-2 mb-3">
+        <label class="source-mode-pill"><input class="form-check-input me-2" type="radio" name="export_mode" value="pdf" checked> PDF فقط</label>
+        <label class="source-mode-pill"><input class="form-check-input me-2" type="radio" name="export_mode" value="channel"> قناة فقط</label>
+        <label class="source-mode-pill"><input class="form-check-input me-2" type="radio" name="export_mode" value="both"> PDF + قناة</label>
+      </div>
+
+      <label class="form-label">حساب النشر لقناة التصدير</label>
+      <select class="form-select mb-3" name="export_account_id">
+        {% for a in accounts %}
+          <option value="{{ a.id }}">{{ a.display_name or a.phone_masked or a.id }}</option>
+        {% endfor %}
+      </select>
+      <label class="form-label">رابط قناة التصدير أو @username</label>
+      <input class="form-control mb-4" name="export_channel_ref" placeholder="https://t.me/export_channel">
+
+      <button class="btn btn-primary w-100" {% if not accounts %}disabled{% endif %}>بدء استخراج روابط واتساب</button>
+    </form>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="panel-card mb-4">
+      <div class="panel-heading"><h2 class="h5 mb-0">عمليات الاستخراج</h2></div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr><th>#</th><th>الحالة</th><th>المحادثات</th><th>الرسائل</th><th>روابط فريدة</th><th>PDF</th></tr></thead>
+          <tbody>
+            {% for job in jobs %}
+              <tr>
+                <td>{{ job.id }}</td>
+                <td><span class="status-pill status-{{ job.status }}">{{ job.status|ar_status }}</span>{% if job.error_text %}<small class="d-block text-danger">{{ job.error_text }}</small>{% endif %}</td>
+                <td>{{ job.chats_scanned }}</td>
+                <td>{{ job.messages_scanned }}</td>
+                <td>{{ job.unique_links }}</td>
+                <td>{% if job.pdf_path %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('whatsapp.download_pdf', job_id=job.id) }}">تحميل</a>{% else %}<span class="text-muted">غير جاهز</span>{% endif %}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="empty-state">لا توجد عمليات بعد.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-heading"><h2 class="h5 mb-0">آخر الروابط المستخرجة</h2></div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr><th>الرابط</th><th>المصدر</th><th>التاريخ</th></tr></thead>
+          <tbody>
+            {% for link in links %}
+              <tr>
+                <td class="text-break"><a target="_blank" href="{{ link.url }}">{{ link.url }}</a></td>
+                <td>{{ link.source_title or 'غير معروف' }}{% if link.source_message_url %}<a class="d-block small" target="_blank" href="{{ link.source_message_url }}">الرسالة</a>{% endif %}</td>
+                <td>{{ link.message_date.strftime('%Y-%m-%d %H:%M') if link.message_date else '—' }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="3" class="empty-state">لم يتم استخراج روابط واتساب بعد.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('selectAllWhatsappAccounts')?.addEventListener('click', () => {
+  const boxes = [...document.querySelectorAll('.whatsapp-account-checkbox')];
+  const value = boxes.some(box => !box.checked);
+  boxes.forEach(box => { box.checked = value; });
+});
+</script>
+{% endblock %}

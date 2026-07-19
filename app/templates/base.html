@@ -30,6 +30,7 @@
       {% if current_user.has_permission('channel.manage') %}<a href="{{ url_for('channel.dashboard') }}"><i class="bi bi-broadcast"></i><span>إدارة القناة</span></a>{% endif %}
       {% if current_user.has_permission('search.manage') %}<a href="{{ url_for('search.index') }}"><i class="bi bi-search"></i><span>البحث والاستكشاف</span></a>{% endif %}
       {% if current_user.has_permission('join.manage') %}<a href="{{ url_for('join_manager.index') }}"><i class="bi bi-person-plus"></i><span>مدير الانضمام</span></a>{% endif %}
+      {% if current_user.has_permission('whatsapp.extract') %}<a href="{{ url_for('whatsapp.index') }}"><i class="bi bi-whatsapp"></i><span>استخراج روابط واتساب</span></a>{% endif %}
       {% if current_user.has_permission('links.manage') %}<a href="{{ url_for('links.index') }}"><i class="bi bi-link-45deg"></i><span>مدير الروابط</span></a>{% endif %}
       {% if current_user.has_permission('reports.view') %}<a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i><span>السجلات والتقارير</span></a>{% endif %}
       {% if current_user.has_permission('operations.manage') %}<a href="{{ url_for('operations.index') }}"><i class="bi bi-gear-wide-connected"></i><span>التشغيل والإنتاج</span></a>{% endif %}
@@ -63,6 +64,7 @@
         {% if current_user.has_permission('channel.manage') %}<a href="{{ url_for('channel.dashboard') }}"><i class="bi bi-broadcast"></i><span>إدارة القناة</span></a>{% endif %}
         {% if current_user.has_permission('search.manage') %}<a href="{{ url_for('search.index') }}"><i class="bi bi-search"></i><span>البحث والاستكشاف</span></a>{% endif %}
         {% if current_user.has_permission('join.manage') %}<a href="{{ url_for('join_manager.index') }}"><i class="bi bi-person-plus"></i><span>مدير الانضمام</span></a>{% endif %}
+        {% if current_user.has_permission('whatsapp.extract') %}<a href="{{ url_for('whatsapp.index') }}"><i class="bi bi-whatsapp"></i><span>استخراج روابط واتساب</span></a>{% endif %}
         {% if current_user.has_permission('links.manage') %}<a href="{{ url_for('links.index') }}"><i class="bi bi-link-45deg"></i><span>مدير الروابط</span></a>{% endif %}
         {% if current_user.has_permission('reports.view') %}<a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i><span>السجلات والتقارير</span></a>{% endif %}
         {% if current_user.has_permission('operations.manage') %}<a href="{{ url_for('operations.index') }}"><i class="bi bi-gear-wide-connected"></i><span>التشغيل والإنتاج</span></a>{% endif %}

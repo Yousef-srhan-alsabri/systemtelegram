@@ -169,6 +169,7 @@ def create_app(config_object=Config):
     from .blueprints.admin import bp as admin_bp
     from .blueprints.search import bp as search_bp
     from .blueprints.join_manager import bp as join_manager_bp
+    from .blueprints.whatsapp import bp as whatsapp_bp
     from .blueprints.settings import bp as settings_bp
     from .blueprints.reports import bp as reports_bp
     from .blueprints.activity import bp as activity_bp
@@ -176,7 +177,7 @@ def create_app(config_object=Config):
     from .blueprints.channel import bp as channel_bp
     from .blueprints.operations import bp as operations_bp
 
-    for blueprint in (auth_bp, main_bp, accounts_bp, groups_bp, messages_bp, content_bp, channel_bp, operations_bp, links_bp, api_bp, admin_bp, search_bp, join_manager_bp, settings_bp, reports_bp, activity_bp):
+    for blueprint in (auth_bp, main_bp, accounts_bp, groups_bp, messages_bp, content_bp, channel_bp, operations_bp, links_bp, api_bp, admin_bp, search_bp, join_manager_bp, whatsapp_bp, settings_bp, reports_bp, activity_bp):
         app.register_blueprint(blueprint)
 
     with app.app_context():

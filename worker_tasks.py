@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import io
+import os
 import random
 import re
 import json
@@ -490,6 +491,8 @@ from app.models import (
     SearchJob,
     SearchJobAccount,
     SearchMessage,
+    WhatsAppLink,
+    WhatsAppScanJob,
 )
 from app.services.discovery import (
     entity_kind,
@@ -653,7 +656,7 @@ async def _execute_search_job(job_id):
     include_global = scope in {"global_only", "global_plus_joined"}
     include_public_messages = bool(getattr(job, "include_public_messages", True)) and include_global
     exclude_system_sources = bool(getattr(job, "exclude_system_sources", True))
-    system_usernames, system_ids = _system_source_identity_sets(job.owner_id) if exclude_system_sources else (set(), set())
+    base_system_usernames, base_system_ids = _system_source_identity_sets(job.owner_id) if exclude_system_sources else (set(), set())
     query_terms = _expanded_search_terms(job.query_text) if getattr(job, "expanded_queries_json", None) else [job.query_text]
     try:
         job.expanded_queries_json = json.dumps(query_terms, ensure_ascii=False)
@@ -669,6 +672,11 @@ async def _execute_search_job(job_id):
             if not await client.is_user_authorized():
                 errors.append(f"الحساب {account.id}: غير مصرح")
                 continue
+
+            system_usernames = set(base_system_usernames)
+            system_ids = set(base_system_ids)
+            if exclude_system_sources:
+                await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids)
 
             dialogs = []
             member_ids = set()
@@ -930,6 +938,230 @@ async def _export_search_job(job_id, export_type):
         return {"status": "completed", "chunks": len(chunks)}
     finally:
         await client.disconnect()
+
+
+def _pdf_escape(value):
+    return str(value or "").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _write_simple_links_pdf(path, title, lines):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    pages = []
+    current = [title, ""]
+    for line in lines:
+        if len(current) >= 46:
+            pages.append(current)
+            current = []
+        current.append(line)
+    if current:
+        pages.append(current)
+
+    objects = []
+    objects.append("<< /Type /Catalog /Pages 2 0 R >>")
+    kids = " ".join(f"{3 + i * 2} 0 R" for i in range(len(pages)))
+    objects.append(f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>")
+    for index, page_lines in enumerate(pages):
+        page_id = 3 + index * 2
+        content_id = page_id + 1
+        stream_lines = ["BT", "/F1 10 Tf", "50 790 Td", "14 TL"]
+        for line_index, line in enumerate(page_lines):
+            text = _pdf_escape(line[:115])
+            if line_index == 0:
+                stream_lines.append(f"({text}) Tj")
+            else:
+                stream_lines.append(f"T* ({text}) Tj")
+        stream_lines.append("ET")
+        stream = "\n".join(stream_lines)
+        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents {content_id} 0 R >>")
+        objects.append(f"<< /Length {len(stream.encode('latin-1', 'ignore'))} >>\nstream\n{stream}\nendstream")
+
+    body = "%PDF-1.4\n"
+    offsets = [0]
+    for number, obj in enumerate(objects, start=1):
+        offsets.append(len(body.encode("latin-1")))
+        body += f"{number} 0 obj\n{obj}\nendobj\n"
+    xref = len(body.encode("latin-1"))
+    body += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n"
+    for offset in offsets[1:]:
+        body += f"{offset:010d} 00000 n \n"
+    body += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
+    with open(path, "wb") as handle:
+        handle.write(body.encode("latin-1", "ignore"))
+
+
+async def _add_export_ref_to_system_sets(client, channel_ref, usernames, ids):
+    username = _username_from_ref(channel_ref)
+    if username:
+        usernames.add(username)
+    if not channel_ref:
+        return
+    try:
+        entity = await client.get_entity(channel_ref)
+        entity_username = getattr(entity, "username", None)
+        if entity_username:
+            usernames.add(entity_username.lower())
+        entity_id = getattr(entity, "id", None)
+        if entity_id:
+            ids.add(abs(int(entity_id)))
+    except Exception:
+        pass
+
+
+async def _resolve_system_sources_with_client(client, owner_id, usernames, ids):
+    refs = []
+    setting = ExportSetting.query.filter_by(owner_id=owner_id).first()
+    if setting and setting.channel_ref:
+        refs.append(setting.channel_ref)
+    refs.extend(source.source_channel_ref for source in JoinSource.query.filter_by(owner_id=owner_id).all() if source.source_channel_ref)
+    for ref in refs:
+        await _add_export_ref_to_system_sets(client, ref, usernames, ids)
+
+
+def execute_whatsapp_scan_job(job_id, account_ids):
+    return asyncio.run(_execute_whatsapp_scan_job(job_id, account_ids))
+
+
+async def _execute_whatsapp_scan_job(job_id, account_ids):
+    job = db.session.get(WhatsAppScanJob, job_id)
+    if not job:
+        return {"status": "missing"}
+
+    job.status = "running"
+    job.started_at = utcnow()
+    job.error_text = None
+    db.session.commit()
+
+    accounts = TelegramAccount.query.filter(
+        TelegramAccount.id.in_(list(account_ids or [])),
+        TelegramAccount.owner_id == job.owner_id,
+        TelegramAccount.status == "active",
+    ).order_by(TelegramAccount.id.asc()).all()
+    if not accounts:
+        job.status = "failed"
+        job.error_text = "no active accounts"
+        job.completed_at = utcnow()
+        db.session.commit()
+        return {"status": "failed"}
+
+    errors = []
+    limit = max(50, min(get_int(job.owner_id, "WHATSAPP_SCAN_MESSAGE_LIMIT", current_app.config.get("WHATSAPP_SCAN_MESSAGE_LIMIT", 2000)), 10000))
+    allowed_kinds = {"group", "channel"} if job.scope == "groups_channels" else {job.scope[:-1] if job.scope.endswith("s") else job.scope}
+
+    for account in accounts:
+        client = _account_client(account)
+        try:
+            await client.connect()
+            if not await client.is_user_authorized():
+                errors.append(f"account {account.id}: unauthorized")
+                continue
+
+            system_usernames, system_ids = _system_source_identity_sets(job.owner_id)
+            await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids)
+            await _add_export_ref_to_system_sets(client, job.export_channel_ref, system_usernames, system_ids)
+
+            dialogs = await client.get_dialogs(limit=None)
+            for dialog in dialogs:
+                kind = entity_kind(dialog.entity)
+                if kind not in allowed_kinds:
+                    continue
+                username = getattr(dialog.entity, "username", None)
+                entity_id = getattr(dialog.entity, "id", None)
+                if _is_system_source(username=username, entity_id=entity_id, usernames=system_usernames, ids=system_ids):
+                    continue
+
+                job.chats_scanned += 1
+                title = dialog.name or entity_title(dialog.entity)
+                try:
+                    async for message in client.iter_messages(dialog.entity, limit=limit):
+                        message_date = getattr(message, "date", None)
+                        if job.start_date and message_date and message_date < job.start_date:
+                            break
+                        job.messages_scanned += 1
+                        links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp"]
+                        if not links:
+                            continue
+                        job.links_found += len(links)
+                        source_url = public_message_url(username, int(message.id))
+                        for link in links:
+                            existing = WhatsAppLink.query.filter_by(scan_job_id=job.id, url_hash=link.url_hash).first()
+                            if existing:
+                                continue
+                            db.session.add(WhatsAppLink(
+                                owner_id=job.owner_id,
+                                scan_job_id=job.id,
+                                account_id=account.id,
+                                url=link.url,
+                                url_hash=link.url_hash,
+                                source_title=title,
+                                source_username=username,
+                                source_type=kind,
+                                source_message_id=int(message.id),
+                                source_message_url=source_url,
+                                message_date=message_date,
+                            ))
+                            job.unique_links += 1
+                        db.session.commit()
+                except FloodWaitError as exc:
+                    errors.append(f"account {account.id}: FloodWait {exc.seconds}s")
+                    break
+                except Exception as exc:
+                    errors.append(f"chat {title}: {type(exc).__name__}")
+                    continue
+                db.session.commit()
+        except Exception as exc:
+            errors.append(f"account {account.id}: {type(exc).__name__}")
+        finally:
+            await client.disconnect()
+
+    links = WhatsAppLink.query.filter_by(scan_job_id=job.id).order_by(WhatsAppLink.id.asc()).all()
+    export_lines = []
+    for index, row in enumerate(links, start=1):
+        source = row.source_title or "unknown source"
+        when = row.message_date.strftime("%Y-%m-%d %H:%M") if row.message_date else ""
+        export_lines.append(f"{index}. {row.url}")
+        export_lines.append(f"   source: {source} {when}".strip())
+        if row.source_message_url:
+            export_lines.append(f"   message: {row.source_message_url}")
+        export_lines.append("")
+
+    if job.export_mode in {"pdf", "both"}:
+        filename = f"whatsapp-links-{job.id}.pdf"
+        path = os.path.join(current_app.instance_path, "exports", filename)
+        _write_simple_links_pdf(path, f"WhatsApp links scan #{job.id}", export_lines or ["No WhatsApp links found."])
+        job.pdf_path = path
+        db.session.commit()
+
+    if job.export_mode in {"channel", "both"} and job.export_channel_ref and job.export_account_id:
+        account = db.session.get(TelegramAccount, job.export_account_id)
+        if account and account.status == "active":
+            client = _account_client(account)
+            try:
+                await client.connect()
+                entity = await client.get_entity(job.export_channel_ref)
+                header = f"WhatsApp links scan #{job.id}\nUnique links: {len(links)}\n"
+                chunks, current = [], header + "\n"
+                for line in export_lines or ["No WhatsApp links found."]:
+                    addition = line + "\n"
+                    if len(current) + len(addition) > 3500:
+                        chunks.append(current.strip())
+                        current = addition
+                    else:
+                        current += addition
+                if current.strip():
+                    chunks.append(current.strip())
+                for chunk in chunks:
+                    await client.send_message(entity, chunk, link_preview=False)
+                    await asyncio.sleep(1)
+            except Exception as exc:
+                errors.append(f"export channel: {type(exc).__name__}")
+            finally:
+                await client.disconnect()
+
+    job.status = "completed" if links else "completed_empty"
+    job.error_text = " | ".join(errors)[:3000] if errors else None
+    job.completed_at = utcnow()
+    db.session.commit()
+    return {"status": job.status, "links": len(links)}
 
 
 def scan_join_source(scan_job_id):

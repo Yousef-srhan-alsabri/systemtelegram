@@ -266,6 +266,45 @@ class DiscoveredLink(db.Model):
     __table_args__ = (db.UniqueConstraint("owner_id", "search_job_id", "url_hash", name="uq_discovered_job_link"),)
 
 
+class WhatsAppScanJob(db.Model):
+    __tablename__ = "whatsapp_scan_jobs"
+    id = db.Column(db.Integer, primary_key=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = db.Column(db.String(32), default="queued", nullable=False, index=True)
+    scope = db.Column(db.String(32), default="groups_channels", nullable=False, index=True)
+    start_date = db.Column(db.DateTime(timezone=True), nullable=True)
+    export_mode = db.Column(db.String(24), default="pdf", nullable=False)
+    export_channel_ref = db.Column(db.String(500), nullable=True)
+    export_account_id = db.Column(db.Integer, db.ForeignKey("telegram_accounts.id", ondelete="SET NULL"), nullable=True)
+    messages_scanned = db.Column(db.Integer, default=0, nullable=False)
+    chats_scanned = db.Column(db.Integer, default=0, nullable=False)
+    links_found = db.Column(db.Integer, default=0, nullable=False)
+    unique_links = db.Column(db.Integer, default=0, nullable=False)
+    pdf_path = db.Column(db.Text, nullable=True)
+    error_text = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    started_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    completed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+
+class WhatsAppLink(db.Model):
+    __tablename__ = "whatsapp_links"
+    id = db.Column(db.Integer, primary_key=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    scan_job_id = db.Column(db.Integer, db.ForeignKey("whatsapp_scan_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = db.Column(db.Integer, db.ForeignKey("telegram_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    url = db.Column(db.Text, nullable=False)
+    url_hash = db.Column(db.String(64), nullable=False, index=True)
+    source_title = db.Column(db.String(500), nullable=True)
+    source_username = db.Column(db.String(255), nullable=True)
+    source_type = db.Column(db.String(24), nullable=True)
+    source_message_id = db.Column(db.BigInteger, nullable=True)
+    source_message_url = db.Column(db.Text, nullable=True)
+    message_date = db.Column(db.DateTime(timezone=True), nullable=True)
+    discovered_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    __table_args__ = (db.UniqueConstraint("scan_job_id", "url_hash", name="uq_whatsapp_scan_link"),)
+
+
 class ExportSetting(db.Model):
     __tablename__ = "export_settings"
     id = db.Column(db.Integer, primary_key=True)
