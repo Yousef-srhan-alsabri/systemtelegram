@@ -1,128 +1,223 @@
 {% extends 'base.html' %}
-{% block title %}مدير الاكتشاف والانضمام{% endblock %}
+{% block title %}مدير الانضمام{% endblock %}
 {% block content %}
-<div class="page-header"><div><span class="eyebrow">Join Manager</span><h1>مدير الاكتشاف والانضمام</h1><p>اقرأ روابط Telegram من قناتك، افحصها، ثم اعتمد عدداً محدوداً للانضمام أو إرسال طلب موافقة.</p></div></div>
-<div class="alert alert-warning">
-  الانضمام يتم بعد مراجعة يدوية، وبحد أقصى {{ max_items }} روابط في الدفعة الواحدة لكل حساب. يمكن تشغيل المهمة على أكثر من حساب، وكل حساب له قفل مستقل.
-  <div class="small mt-1">{% if resume_after_floodwait %}استئناف FloodWait مفعّل: إذا طلب تيليجرام الانتظار لمدة لا تتجاوز {{ max_floodwait_sleep }} ثانية، ينتظر النظام ثم يكمل تلقائياً.{% else %}استئناف FloodWait غير مفعّل: ستتوقف المهمة عند حد تيليجرام حتى تعيد تشغيلها يدوياً.{% endif %}</div>
-  {% if continue_batches %}
-    <div class="small mt-1">المتابعة التلقائية مفعّلة: انتظار {{ batch_pause_seconds }} ثانية بين الدفعات، وبحد أقصى {{ max_batches }} دفعات متتالية. يمكنك تعديلها من صفحة الإعدادات.</div>
-  {% else %}
-    <div class="small mt-1">المتابعة التلقائية بين الدفعات غير مفعّلة. يمكن تفعيلها من صفحة الإعدادات.</div>
-  {% endif %}
+<div class="page-header">
+  <div>
+    <span class="eyebrow">Join Manager</span>
+    <h1>مدير الانضمام</h1>
+    <p>اجمع روابط Telegram من قناة مصدر، افحصها، ثم نفذ الانضمام على حساب واحد أو عدة حسابات بخيارات واضحة.</p>
+  </div>
 </div>
-<div class="row g-4 mb-4">
-  <div class="col-xl-5"><div class="panel-card p-4"><h2 class="h5">إضافة قناة مصدر</h2><form method="post" action="{{ url_for('join_manager.save_source') }}"><label class="form-label">الحساب القارئ والمنضم</label><select class="form-select mb-3" name="account_id" required>{% for a in accounts %}<option value="{{ a.id }}">{{ a.display_name or a.id }}</option>{% endfor %}</select><label class="form-label">رابط قناة الروابط</label><input class="form-control mb-3" name="source_channel_ref" placeholder="https://t.me/my_links_channel" required><button class="btn btn-primary w-100">حفظ المصدر</button></form></div></div>
-  <div class="col-xl-7"><div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">مصادر الروابط المحفوظة</h2></div><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>المصدر</th><th>الحساب</th><th>آخر رسالة</th><th></th></tr></thead><tbody>{% for s in sources %}<tr><td>{{ s.source_channel_title or s.source_channel_ref }}</td><td>{{ s.account_id }}</td><td>{{ s.last_scanned_message_id }}</td><td><div class="d-flex gap-2"><form method="post" action="{{ url_for('join_manager.scan',source_id=s.id) }}"><button class="btn btn-sm btn-outline-primary">فحص الجديد</button></form><form method="post" action="{{ url_for('join_manager.scan',source_id=s.id) }}"><input type="hidden" name="full_scan" value="1"><button class="btn btn-sm btn-outline-secondary">إعادة فحص الكل</button></form><form method="post" action="{{ url_for('join_manager.delete_source',source_id=s.id) }}" onsubmit="return confirm('حذف المصدر؟')"><button class="btn btn-sm btn-outline-danger">حذف</button></form></div></td></tr>{% else %}<tr><td colspan="4" class="empty-state">لا توجد مصادر.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="stat-card"><span>روابط جاهزة</span><strong>{{ join_stats.all_valid }}</strong></div></div>
+  <div class="col-6 col-xl-3"><div class="stat-card"><span>قروبات</span><strong>{{ join_stats.groups }}</strong></div></div>
+  <div class="col-6 col-xl-3"><div class="stat-card"><span>قنوات</span><strong>{{ join_stats.channels }}</strong></div></div>
+  <div class="col-6 col-xl-3"><div class="stat-card"><span>تحتاج موافقة</span><strong>{{ join_stats.approval_required }}</strong></div></div>
 </div>
-<div class="panel-card mb-4">
-  <div class="panel-heading">
-    <div>
-      <h2 class="h5 mb-1">الروابط المكتشفة</h2>
-      <small>يمكنك تحديد روابط محددة أو اختيار الانضمام إلى الكل / الجروبات / القنوات / روابط الدعوة.</small>
+
+<ul class="nav nav-pills app-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#joinSourcesTab" type="button">المصادر</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#joinExecuteTab" type="button">تنفيذ الانضمام</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#joinHistoryTab" type="button">السجل</button></li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="joinSourcesTab">
+    <div class="row g-4">
+      <div class="col-xl-4">
+        <div class="panel-card p-4">
+          <h2 class="h5 mb-3">إضافة قناة مصدر</h2>
+          <form method="post" action="{{ url_for('join_manager.save_source') }}">
+            <label class="form-label">الحساب القارئ</label>
+            <select class="form-select mb-3" name="account_id" required>
+              {% for a in accounts %}<option value="{{ a.id }}">{{ a.display_name or a.phone_masked or a.id }}</option>{% endfor %}
+            </select>
+            <label class="form-label">رابط قناة الروابط</label>
+            <input class="form-control mb-3" name="source_channel_ref" placeholder="https://t.me/my_links_channel" required>
+            <button class="btn btn-primary w-100">حفظ المصدر</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-xl-8">
+        <div class="panel-card">
+          <div class="panel-heading"><h2 class="h5 mb-0">المصادر المحفوظة</h2></div>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead><tr><th>المصدر</th><th>الحساب</th><th>آخر رسالة</th><th>الإجراء</th></tr></thead>
+              <tbody>
+                {% for s in sources %}
+                  <tr>
+                    <td class="text-break">{{ s.source_channel_title or s.source_channel_ref }}</td>
+                    <td>{{ s.account_id }}</td>
+                    <td>{{ s.last_scanned_message_id }}</td>
+                    <td>
+                      <div class="action-row">
+                        <form method="post" action="{{ url_for('join_manager.scan',source_id=s.id) }}"><button class="btn btn-sm btn-outline-primary">فحص الجديد</button></form>
+                        <form method="post" action="{{ url_for('join_manager.scan',source_id=s.id) }}"><input type="hidden" name="full_scan" value="1"><button class="btn btn-sm btn-outline-secondary">إعادة فحص الكل</button></form>
+                        <form method="post" action="{{ url_for('join_manager.delete_source',source_id=s.id) }}" onsubmit="return confirm('حذف المصدر؟')"><button class="btn btn-sm btn-outline-danger">حذف</button></form>
+                      </div>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4" class="empty-state">لا توجد مصادر بعد.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <form method="post" action="{{ url_for('join_manager.execute') }}" id="joinExecuteForm">
-    <div class="p-3 border-bottom">
-      <div class="row g-3 align-items-end">
-        <div class="col-lg-4">
+  <div class="tab-pane fade" id="joinExecuteTab">
+    <form method="post" action="{{ url_for('join_manager.execute') }}" id="joinExecuteForm" class="panel-card overflow-hidden">
+      <div class="join-command-panel">
+        <div>
           <label class="form-label">حسابات التنفيذ</label>
           <select class="form-select" name="account_ids" id="joinAccountIds" multiple size="5" required>
             {% for a in accounts %}
               <option value="{{ a.id }}">{{ a.display_name or a.phone_masked or a.id }}</option>
             {% endfor %}
           </select>
-          <small class="text-muted d-block mt-1">يمكنك تحديد أكثر من حساب بالضغط على Ctrl. كل حساب ينفذ دفعته الخاصة.</small>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" id="selectAllAccountsBtn" class="btn btn-sm btn-outline-primary">تحديد كل الحسابات</button>
-            <button type="button" id="clearAccountsBtn" class="btn btn-sm btn-outline-dark">إلغاء الحسابات</button>
+          <div class="action-row mt-2">
+            <button type="button" id="selectAllAccountsBtn" class="btn btn-sm btn-outline-primary">تحديد الحسابات</button>
+            <button type="button" id="clearAccountsBtn" class="btn btn-sm btn-outline-secondary">إلغاء الحسابات</button>
           </div>
         </div>
-        <div class="col-lg-5">
-          <label class="form-label">خيار الانضمام</label>
+
+        <div>
+          <label class="form-label">طريقة التنفيذ</label>
           <select class="form-select" name="join_mode" id="joinMode">
-            <option value="selected">الروابط المحددة فقط</option>
-            <option value="all_valid">الكل / كل الروابط الجاهزة ({{ join_stats.all_valid }})</option>
-            <option value="groups">الجروبات فقط ({{ join_stats.groups }})</option>
+            <option value="selected">الروابط المحددة في الجدول</option>
+            <option value="all_valid">كل الروابط الجاهزة ({{ join_stats.all_valid }})</option>
+            <option value="groups">القروبات فقط ({{ join_stats.groups }})</option>
             <option value="channels">القنوات فقط ({{ join_stats.channels }})</option>
             <option value="invites">روابط الدعوة فقط ({{ join_stats.invites }})</option>
-            <option value="approval_required">التي تتطلب طلب انضمام فقط ({{ join_stats.approval_required }})</option>
+            <option value="approval_required">التي تحتاج موافقة فقط ({{ join_stats.approval_required }})</option>
           </select>
-          <small class="text-muted">سيطبق النظام الحد الأقصى الحالي: {{ max_items }} رابط في الدفعة الواحدة. غيّره من الإعدادات.</small>
-          <small class="text-muted d-block">{% if continue_batches %}سيستمر تلقائياً للدفعات التالية حتى {{ max_batches }} دفعات، مع انتظار {{ batch_pause_seconds }} ثانية بين كل دفعة.{% else %}لن ينتقل تلقائياً للدفعة التالية حالياً.{% endif %}</small>
+          <div class="join-mode-note mt-2">
+            الحد الحالي لكل دفعة: {{ max_items }} رابط.
+            {% if continue_batches %}المتابعة التلقائية مفعلة حتى {{ max_batches }} دفعات.{% else %}المتابعة التلقائية بين الدفعات غير مفعلة.{% endif %}
+          </div>
         </div>
-        <div class="col-lg-3 d-grid">
-          <button type="submit" class="btn btn-success">بدء الانضمام</button>
+
+        <div class="d-grid align-self-end">
+          <button type="submit" class="btn btn-success btn-lg">بدء الانضمام</button>
         </div>
       </div>
 
-      <div class="d-flex flex-wrap gap-2 mt-3">
-        <button type="button" id="selectAllLinksBtn" class="btn btn-sm btn-outline-primary">تحديد كل الصالح</button>
-        <button type="button" id="selectGroupsBtn" class="btn btn-sm btn-outline-secondary">تحديد الجروبات</button>
-        <button type="button" id="selectChannelsBtn" class="btn btn-sm btn-outline-secondary">تحديد القنوات</button>
-        <button type="button" id="selectInvitesBtn" class="btn btn-sm btn-outline-secondary">تحديد الدعوات</button>
-        <button type="button" id="selectApprovalBtn" class="btn btn-sm btn-outline-warning">تحديد طلبات الموافقة</button>
-        <button type="button" id="clearLinksBtn" class="btn btn-sm btn-outline-dark">إلغاء التحديد</button>
+      <div class="selection-toolbar">
+        <div class="selection-summary">
+          <strong>الروابط المكتشفة</strong>
+          <span id="selectedLinksCount">0 محدد</span>
+        </div>
+        <div class="action-row">
+          <button type="button" id="selectAllLinksBtn" class="btn btn-sm btn-outline-primary">تحديد الصالح</button>
+          <button type="button" id="selectGroupsBtn" class="btn btn-sm btn-outline-secondary">القروبات</button>
+          <button type="button" id="selectChannelsBtn" class="btn btn-sm btn-outline-secondary">القنوات</button>
+          <button type="button" id="selectInvitesBtn" class="btn btn-sm btn-outline-secondary">الدعوات</button>
+          <button type="button" id="selectApprovalBtn" class="btn btn-sm btn-outline-warning">تحتاج موافقة</button>
+          <button type="button" id="clearLinksBtn" class="btn btn-sm btn-outline-dark">إلغاء التحديد</button>
+        </div>
       </div>
-    </div>
 
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead>
-          <tr>
-            <th style="width:46px"><input class="form-check-input" type="checkbox" id="toggleAllJoinLinks" title="تحديد كل الصالح"></th>
-            <th>الاسم</th>
-            <th>الرابط</th>
-            <th>النوع</th>
-            <th>الحالة</th>
-            <th>المصدر</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for l in links %}
-            {% set is_valid = l.status in ['valid_public','valid_invite','already_member','joined','join_request_pending'] %}
+      <div class="table-responsive join-links-table">
+        <table class="table align-middle mb-0">
+          <thead>
             <tr>
-              <td>
-                <input
-                  class="form-check-input join-link-check"
-                  type="checkbox"
-                  name="link_ids"
-                  value="{{ l.id }}"
-                  data-type="{{ l.entity_type or '' }}"
-                  data-invite="{{ 1 if l.invite_hash else 0 }}"
-                  data-approval="{{ 1 if l.requires_approval else 0 }}"
-                  {% if not is_valid %}disabled{% endif %}
-                >
-              </td>
-              <td>{{ l.entity_title or 'غير معروف' }}</td>
-              <td class="text-break"><a target="_blank" href="{{ l.url }}">{{ l.url }}</a></td>
-              <td>
-                {% if l.entity_type == 'group' %}
-                  <span class="badge text-bg-primary">جروب</span>
-                {% elif l.entity_type == 'channel' %}
-                  <span class="badge text-bg-info">قناة</span>
-                {% else %}
-                  <span class="badge text-bg-secondary">{{ l.entity_type or '—' }}</span>
-                {% endif %}
-                {% if l.invite_hash %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
-              </td>
-              <td>
-                <span class="status-pill status-{{ l.status }}">{{ l.status|ar_status }}</span>
-                {% if l.requires_approval %}<small class="d-block text-warning">يتطلب موافقة</small>{% endif %}
-                {% if l.error_text %}<small class="d-block text-danger">{{ l.error_text }}</small>{% endif %}
-              </td>
-              <td>{% if l.source_message_url %}<a target="_blank" href="{{ l.source_message_url }}">الرسالة</a>{% else %}—{% endif %}</td>
+              <th style="width:46px"><input class="form-check-input" type="checkbox" id="toggleAllJoinLinks" title="تحديد كل الصالح"></th>
+              <th>الاسم</th>
+              <th>الرابط</th>
+              <th>النوع</th>
+              <th>الحالة</th>
+              <th>المصدر</th>
             </tr>
-          {% else %}
-            <tr><td colspan="6" class="empty-state">لم تُكتشف روابط بعد.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </form>
-</div>
+          </thead>
+          <tbody>
+            {% for l in links %}
+              {% set is_valid = l.status in ['valid_public','valid_invite','already_member','joined','join_request_pending'] %}
+              <tr>
+                <td><input class="form-check-input join-link-check" type="checkbox" name="link_ids" value="{{ l.id }}" data-type="{{ l.entity_type or '' }}" data-invite="{{ 1 if l.invite_hash else 0 }}" data-approval="{{ 1 if l.requires_approval else 0 }}" {% if not is_valid %}disabled{% endif %}></td>
+                <td>{{ l.entity_title or 'غير معروف' }}</td>
+                <td class="text-break"><a target="_blank" rel="noopener" href="{{ l.url }}">{{ l.url }}</a></td>
+                <td>
+                  {% if l.entity_type == 'group' %}<span class="badge text-bg-primary">قروب</span>
+                  {% elif l.entity_type == 'channel' %}<span class="badge text-bg-info">قناة</span>
+                  {% else %}<span class="badge text-bg-secondary">{{ l.entity_type or 'غير محدد' }}</span>{% endif %}
+                  {% if l.invite_hash %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
+                </td>
+                <td>
+                  <span class="status-pill status-{{ l.status }}">{{ l.status|ar_status }}</span>
+                  {% if l.requires_approval %}<small class="d-block text-warning">يتطلب موافقة</small>{% endif %}
+                  {% if l.error_text %}<small class="d-block text-danger">{{ l.error_text }}</small>{% endif %}
+                </td>
+                <td>{% if l.source_message_url %}<a target="_blank" rel="noopener" href="{{ l.source_message_url }}">الرسالة</a>{% else %}<span class="text-muted">غير متاح</span>{% endif %}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="empty-state">لم تُكتشف روابط بعد.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </div>
 
+  <div class="tab-pane fade" id="joinHistoryTab">
+    <div class="row g-4">
+      <div class="col-xl-5">
+        <div class="panel-card">
+          <div class="panel-heading"><h2 class="h5 mb-0">عمليات الفحص</h2></div>
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead><tr><th>#</th><th>الحالة</th><th>رسائل</th><th>جديد</th><th>الخطأ</th></tr></thead>
+              <tbody>
+                {% for s in scans %}
+                  <tr><td>{{ s.id }}</td><td><span class="status-pill status-{{ s.status }}">{{ s.status|ar_status }}</span></td><td>{{ s.messages_scanned }}</td><td>{{ s.unique_links }}</td><td class="small text-danger">{{ s.error_text or "—" }}</td></tr>
+                {% else %}
+                  <tr><td colspan="5" class="empty-state">لا توجد عمليات.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-7">
+        <div class="panel-card">
+          <div class="panel-heading"><h2 class="h5 mb-0">مهام الانضمام</h2></div>
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead><tr><th>#</th><th>الحساب</th><th>الحالة</th><th>الدفعة</th><th>الوضع</th><th>الكل</th><th>انضم</th><th>طلبات</th><th>فشل</th><th></th></tr></thead>
+              <tbody>
+                {% for j in jobs %}
+                  <tr>
+                    <td>{{ j.id }}</td>
+                    <td>{{ j.account_id }}</td>
+                    <td><span class="status-pill status-{{ j.status }}">{{ j.status|ar_status }}</span></td>
+                    <td>{{ j.batch_index or 1 }} / {{ j.max_batches or 1 }}</td>
+                    <td>{{ j.selection_mode|ar_status }}{% if j.auto_continue %}<span class="badge text-bg-info d-block mt-1">متابعة تلقائية</span>{% endif %}</td>
+                    <td>{{ j.total_links }}</td>
+                    <td>{{ j.joined_count }}</td>
+                    <td>{{ j.request_pending_count }}</td>
+                    <td>{{ j.failed_count }}</td>
+                    <td><a class="btn btn-sm btn-light" href="{{ url_for('join_manager.job_detail', job_id=j.id) }}">عرض</a></td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="10" class="empty-state">لا توجد مهام.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 let joinSelectionRun = 0;
 
@@ -138,15 +233,21 @@ function linkMatchesMode(box, mode) {
     (mode === 'approval' && approval);
 }
 
+function selectedJoinAccountsCount() {
+  const select = document.getElementById('joinAccountIds');
+  return select ? Array.from(select.options).filter(option => option.selected).length : 0;
+}
+
+function updateSelectedLinksCount() {
+  const count = document.querySelectorAll('.join-link-check:checked').length;
+  const label = document.getElementById('selectedLinksCount');
+  const mode = document.getElementById('joinMode');
+  if (label) label.textContent = count + ' محدد';
+  if (count > 0 && mode) mode.value = 'selected';
+}
+
 function setJoinSelectionBusy(busy) {
-  [
-    'selectAllLinksBtn',
-    'selectGroupsBtn',
-    'selectChannelsBtn',
-    'selectInvitesBtn',
-    'selectApprovalBtn',
-    'clearLinksBtn',
-  ].forEach(id => {
+  ['selectAllLinksBtn','selectGroupsBtn','selectChannelsBtn','selectInvitesBtn','selectApprovalBtn','clearLinksBtn'].forEach(id => {
     const btn = document.getElementById(id);
     if (!btn) return;
     btn.disabled = busy;
@@ -158,9 +259,10 @@ function selectJoinLinks(mode) {
   const runId = ++joinSelectionRun;
   const boxes = Array.from(document.querySelectorAll('.join-link-check'));
   const toggleAll = document.getElementById('toggleAllJoinLinks');
+  const joinMode = document.getElementById('joinMode');
   const batchSize = 80;
   let index = 0;
-
+  if (joinMode) joinMode.value = 'selected';
   setJoinSelectionBusy(true);
 
   function applyBatch() {
@@ -177,111 +279,47 @@ function selectJoinLinks(mode) {
       toggleAll.checked = mode === 'all';
       toggleAll.indeterminate = false;
     }
+    updateSelectedLinksCount();
     setJoinSelectionBusy(false);
   }
-
   window.requestAnimationFrame(applyBatch);
 }
 
 function selectJoinAccounts(mode) {
   const select = document.getElementById('joinAccountIds');
   if (!select) return;
-  for (const option of select.options) {
-    option.selected = mode === 'all';
-  }
-}
-
-function selectedJoinAccountsCount() {
-  const select = document.getElementById('joinAccountIds');
-  if (!select) return 0;
-  return Array.from(select.options).filter(o => o.selected).length;
+  Array.from(select.options).forEach(option => { option.selected = mode === 'all'; });
 }
 
 function confirmJoinMode() {
-  const mode = document.getElementById('joinMode').value;
+  const mode = document.getElementById('joinMode')?.value || 'selected';
   const accountsCount = selectedJoinAccountsCount();
   if (!accountsCount) {
     alert('حدد حساب تنفيذ واحداً على الأقل.');
     return false;
   }
-  if (mode === 'selected') {
-    const checked = document.querySelectorAll('.join-link-check:checked').length;
-    if (!checked) {
-      alert('حدد رابطاً واحداً على الأقل، أو غيّر خيار الانضمام إلى الكل / الجروبات / القنوات.');
-      return false;
-    }
+  if (mode === 'selected' && !document.querySelectorAll('.join-link-check:checked').length) {
+    alert('حدد رابطاً واحداً على الأقل، أو اختر طريقة تنفيذ لا تعتمد على التحديد اليدوي.');
+    return false;
   }
-  return confirm('تأكيد بدء مهمة الانضمام على ' + accountsCount + ' حساب/حسابات حسب الخيار المحدد؟');
+  return confirm('تأكيد بدء مهمة الانضمام على ' + accountsCount + ' حساب/حسابات؟');
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('joinExecuteForm');
-  const toggleAllJoinLinks = document.getElementById('toggleAllJoinLinks');
-  const selectAllAccountsBtn = document.getElementById('selectAllAccountsBtn');
-  const clearAccountsBtn = document.getElementById('clearAccountsBtn');
-  const selectAllLinksBtn = document.getElementById('selectAllLinksBtn');
-  const selectGroupsBtn = document.getElementById('selectGroupsBtn');
-  const selectChannelsBtn = document.getElementById('selectChannelsBtn');
-  const selectInvitesBtn = document.getElementById('selectInvitesBtn');
-  const selectApprovalBtn = document.getElementById('selectApprovalBtn');
-  const clearLinksBtn = document.getElementById('clearLinksBtn');
-
-  if (toggleAllJoinLinks) {
-    toggleAllJoinLinks.addEventListener('change', function () {
-      selectJoinLinks(this.checked ? 'all' : 'none');
-    });
-  }
-
-  if (selectAllAccountsBtn) {
-    selectAllAccountsBtn.addEventListener('click', function () {
-      selectJoinAccounts('all');
-    });
-  }
-  if (clearAccountsBtn) {
-    clearAccountsBtn.addEventListener('click', function () {
-      selectJoinAccounts('none');
-    });
-  }
-  if (selectAllLinksBtn) {
-    selectAllLinksBtn.addEventListener('click', function () {
-      selectJoinLinks('all');
-    });
-  }
-  if (selectGroupsBtn) {
-    selectGroupsBtn.addEventListener('click', function () {
-      selectJoinLinks('groups');
-    });
-  }
-  if (selectChannelsBtn) {
-    selectChannelsBtn.addEventListener('click', function () {
-      selectJoinLinks('channels');
-    });
-  }
-  if (selectInvitesBtn) {
-    selectInvitesBtn.addEventListener('click', function () {
-      selectJoinLinks('invites');
-    });
-  }
-  if (selectApprovalBtn) {
-    selectApprovalBtn.addEventListener('click', function () {
-      selectJoinLinks('approval');
-    });
-  }
-  if (clearLinksBtn) {
-    clearLinksBtn.addEventListener('click', function () {
-      selectJoinLinks('none');
-    });
-  }
-
-  if (form) {
-    form.addEventListener('submit', function (event) {
-      const ok = confirmJoinMode();
-      if (!ok) {
-        event.preventDefault();
-      }
-    });
-  }
+  document.getElementById('toggleAllJoinLinks')?.addEventListener('change', event => selectJoinLinks(event.target.checked ? 'all' : 'none'));
+  document.getElementById('selectAllAccountsBtn')?.addEventListener('click', () => selectJoinAccounts('all'));
+  document.getElementById('clearAccountsBtn')?.addEventListener('click', () => selectJoinAccounts('none'));
+  document.getElementById('selectAllLinksBtn')?.addEventListener('click', () => selectJoinLinks('all'));
+  document.getElementById('selectGroupsBtn')?.addEventListener('click', () => selectJoinLinks('groups'));
+  document.getElementById('selectChannelsBtn')?.addEventListener('click', () => selectJoinLinks('channels'));
+  document.getElementById('selectInvitesBtn')?.addEventListener('click', () => selectJoinLinks('invites'));
+  document.getElementById('selectApprovalBtn')?.addEventListener('click', () => selectJoinLinks('approval'));
+  document.getElementById('clearLinksBtn')?.addEventListener('click', () => selectJoinLinks('none'));
+  document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', updateSelectedLinksCount));
+  document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
+    if (!confirmJoinMode()) event.preventDefault();
+  });
+  updateSelectedLinksCount();
 });
 </script>
-<div class="row g-4"><div class="col-xl-6"><div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">عمليات الفحص</h2></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>#</th><th>الحالة</th><th>رسائل</th><th>روابط جديدة</th><th>الخطأ</th></tr></thead><tbody>{% for s in scans %}<tr><td>{{ s.id }}</td><td><span class="status-pill status-{{ s.status }}">{{ s.status|ar_status }}</span></td><td>{{ s.messages_scanned }}</td><td>{{ s.unique_links }}</td><td class="small text-danger">{{ s.error_text or "—" }}</td></tr>{% else %}<tr><td colspan="5" class="empty-state">لا توجد عمليات.</td></tr>{% endfor %}</tbody></table></div></div></div><div class="col-xl-6"><div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">مهام الانضمام</h2></div><div class="table-responsive"><table class="table mb-0"><thead><tr><th>#</th><th>الحساب</th><th>الحالة</th><th>الدفعة</th><th>الوضع</th><th>الكل</th><th>انضم</th><th>طلبات</th><th>فشل</th><th>التفاصيل</th></tr></thead><tbody>{% for j in jobs %}<tr><td>{{ j.id }}</td><td>{{ j.account_id }}</td><td><span class="status-pill status-{{ j.status }}">{{ j.status|ar_status }}</span></td><td>{{ j.batch_index or 1 }} / {{ j.max_batches or 1 }}</td><td>{{ j.selection_mode|ar_status }}{% if j.auto_continue %}<span class="badge text-bg-info d-block mt-1">متابعة تلقائية</span>{% endif %}</td><td>{{ j.total_links }}</td><td>{{ j.joined_count }}</td><td>{{ j.request_pending_count }}</td><td>{{ j.failed_count }}</td><td><a class="btn btn-sm btn-light" href="{{ url_for('join_manager.job_detail', job_id=j.id) }}">عرض</a></td></tr>{% else %}<tr><td colspan="10" class="empty-state">لا توجد مهام.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
 {% endblock %}

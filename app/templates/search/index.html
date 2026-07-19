@@ -2,46 +2,113 @@
 {% block title %}البحث والاستكشاف{% endblock %}
 {% block content %}
 <div class="page-header">
-  <div><span class="eyebrow">Search Explorer</span><h1>البحث والاستكشاف</h1><p>ابحث في المجموعات والقنوات والرسائل والبوتات، ثم اجمع الروابط وصدرها.</p></div>
+  <div>
+    <span class="eyebrow">Search Explorer</span>
+    <h1>البحث والاستكشاف</h1>
+    <p>ابحث في المجموعات والقنوات والرسائل والبوتات، ثم اجمع الروابط وصدّرها أو أرسلها إلى مدير الانضمام.</p>
+  </div>
 </div>
+
 <div class="row g-4">
   <div class="col-xl-8">
     <form method="post" class="panel-card p-4">
       <label class="form-label fw-bold">عبارة البحث</label>
-      <div class="search-hero mb-4"><input class="form-control form-control-lg" name="query" required minlength="2" placeholder="مثال: جامعة الملك سعود"></div>
-      <div class="search-advanced-grid">
-        <div><label class="form-label">الحد الأقصى لكل حساب</label><select class="form-select" name="max_results"><option value="50">50</option><option value="100">100</option><option value="200" selected>200</option><option value="500">500</option><option value="1000">1000</option></select></div>
-        <div><label class="form-label">نطاق البحث</label><select class="form-select" name="search_scope">
-          <option value="global_plus_joined" {% if default_scope=='global_plus_joined' %}selected{% endif %}>عام + حساباتي</option>
-          <option value="global_only" {% if default_scope=='global_only' %}selected{% endif %}>عام فقط</option>
-          <option value="joined_only" {% if default_scope=='joined_only' %}selected{% endif %}>داخل حساباتي فقط</option>
-        </select><div class="form-text">العام يشمل نتائج Telegram العامة غير المنضم إليها عندما يعيدها Telegram.</div></div>
-        <div><label class="form-label">الترشيح</label><label class="filter-tile mb-2"><input class="form-check-input" type="checkbox" name="saudi_only" value="1" checked><span><strong>ترجيح النتائج السعودية</strong><small>بناءً على الأسماء والمحتوى والنطاقات وأرقام +966</small></span></label><label class="filter-tile"><input class="form-check-input" type="checkbox" name="include_public_messages" value="1" {% if include_public_default %}checked{% endif %}><span><strong>رسائل عامة</strong><small>البحث في الرسائل العامة/المتاحة وليس حساباتي فقط.</small></span></label></div>
-        <div><label class="form-label">تحسينات البحث</label><label class="filter-tile mb-2"><input class="form-check-input" type="checkbox" name="exclude_system_sources" value="1" checked><span><strong>استثناء قنوات النظام</strong><small>لا يخلط قناة الروابط أو قناة التصدير مع نتائج البحث العام.</small></span></label><label class="filter-tile"><input class="form-check-input" type="checkbox" name="search_expansion" value="1" checked><span><strong>توسيع ذكي للكلمات</strong><small>يجرب مرادفات وصيغاً قريبة لنتائج أكثر.</small></span></label></div>
+      <div class="search-hero mb-4">
+        <input class="form-control form-control-lg" name="query" required minlength="2" placeholder="مثال: جامعة الملك سعود">
       </div>
+
+      <div class="search-settings-grid">
+        <div>
+          <label class="form-label">الحد لكل حساب</label>
+          <select class="form-select" name="max_results">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200" selected>200</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">نطاق البحث</label>
+          <select class="form-select" name="search_scope">
+            <option value="global_plus_joined" {% if default_scope=='global_plus_joined' %}selected{% endif %}>عام + حساباتي</option>
+            <option value="global_only" {% if default_scope=='global_only' %}selected{% endif %}>عام فقط</option>
+            <option value="joined_only" {% if default_scope=='joined_only' %}selected{% endif %}>داخل حساباتي فقط</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="option-grid mt-3">
+        <label class="filter-tile"><input class="form-check-input" type="checkbox" name="saudi_only" value="1" checked><span><strong>ترجيح النتائج السعودية</strong><small>حسب الأسماء والمحتوى والنطاقات وأرقام +966.</small></span></label>
+        <label class="filter-tile"><input class="form-check-input" type="checkbox" name="include_public_messages" value="1" {% if include_public_default %}checked{% endif %}><span><strong>رسائل عامة</strong><small>يفحص الرسائل العامة أو المتاحة عند البحث العام.</small></span></label>
+        <label class="filter-tile"><input class="form-check-input" type="checkbox" name="exclude_system_sources" value="1" checked><span><strong>استثناء قنوات النظام</strong><small>يستثني قناة الروابط وقناة التصدير من النتائج.</small></span></label>
+        <label class="filter-tile"><input class="form-check-input" type="checkbox" name="search_expansion" value="1" checked><span><strong>توسيع ذكي للكلمات</strong><small>يجرب صيغاً قريبة لنتائج أوسع.</small></span></label>
+      </div>
+
       <hr class="my-4">
-      <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0">الحسابات المستخدمة</h2><button type="button" class="btn btn-sm btn-light" id="selectAllSearchAccounts">تحديد الكل</button></div>
+
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">الحسابات المستخدمة</h2>
+        <button type="button" class="btn btn-sm btn-light" id="selectAllSearchAccounts">تحديد الكل</button>
+      </div>
       <div class="account-selector search-account-grid">
         {% for a in accounts %}
-        <label class="account-option"><input class="form-check-input search-account-checkbox" type="checkbox" name="account_ids" value="{{ a.id }}"><span><strong>{{ a.display_name or ('حساب '+a.id|string) }}</strong><small>{{ a.phone_masked or 'نشط' }}</small></span></label>
-        {% else %}<div class="empty-state">أضف حساب Telegram نشطاً أولاً.</div>{% endfor %}
+          <label class="account-option"><input class="form-check-input search-account-checkbox" type="checkbox" name="account_ids" value="{{ a.id }}"><span><strong>{{ a.display_name or ('حساب ' ~ a.id) }}</strong><small>{{ a.phone_masked or 'نشط' }}</small></span></label>
+        {% else %}
+          <div class="empty-state">أضف حساب Telegram نشطاً أولاً.</div>
+        {% endfor %}
       </div>
-      <div class="feature-strip mt-4"><span>👥 مجموعات عامة ومنضمة</span><span>📢 قنوات عامة ومنضمة</span><span>💬 رسائل عامة/متاحة</span><span>🤖 بوتات عامة</span><span>🔗 روابط مستخرجة</span></div>
-      <button class="btn btn-primary btn-lg w-100 mt-4">بدء البحث الشامل</button>
+
+      <button class="btn btn-primary btn-lg w-100 mt-4" {% if not accounts %}disabled{% endif %}>بدء البحث الشامل</button>
     </form>
   </div>
+
   <div class="col-xl-4">
     <div class="panel-card p-4 mb-4">
-      <h2 class="h5">قناة التصدير الافتراضية</h2><p class="text-secondary small">تُحفظ مرة واحدة ويمكن تغييرها لاحقاً.</p>
+      <h2 class="h5">قناة التصدير الافتراضية</h2>
+      <p class="text-secondary small">تُحفظ مرة واحدة وتستخدم لتصدير نتائج البحث لاحقاً.</p>
       <form method="post" action="{{ url_for('search.save_export_setting') }}">
-        <label class="form-label">الحساب الناشر</label><select class="form-select mb-3" name="account_id" required>{% for a in accounts %}<option value="{{ a.id }}" {% if setting and setting.account_id==a.id %}selected{% endif %}>{{ a.display_name or a.id }}</option>{% endfor %}</select>
-        <label class="form-label">رابط القناة أو @username</label><input class="form-control mb-3" name="channel_ref" value="{{ setting.channel_ref if setting else '' }}" placeholder="https://t.me/my_channel" required>
+        <label class="form-label">الحساب الناشر</label>
+        <select class="form-select mb-3" name="account_id" required>
+          {% for a in accounts %}
+            <option value="{{ a.id }}" {% if setting and setting.account_id==a.id %}selected{% endif %}>{{ a.display_name or a.phone_masked or a.id }}</option>
+          {% endfor %}
+        </select>
+        <label class="form-label">رابط القناة أو @username</label>
+        <input class="form-control mb-3" name="channel_ref" value="{{ setting.channel_ref if setting else '' }}" placeholder="https://t.me/my_channel" required>
         <button class="btn btn-outline-primary w-100">حفظ واختبار الوصول</button>
       </form>
-      {% if setting %}<div class="setting-status mt-3"><span class="status-pill status-{{ 'active' if setting.is_active else 'queued' }}">{{ 'جاهزة' if setting.is_active else 'قيد التحقق' }}</span><strong>{{ setting.channel_title or setting.channel_ref }}</strong></div>{% endif %}
+      {% if setting %}
+        <div class="setting-status mt-3">
+          <span class="status-pill status-{{ 'active' if setting.is_active else 'queued' }}">{{ 'جاهزة' if setting.is_active else 'قيد التحقق' }}</span>
+          <strong>{{ setting.channel_title or setting.channel_ref }}</strong>
+        </div>
+      {% endif %}
     </div>
-    <div class="panel-card"><div class="panel-heading"><h2 class="h5 mb-0">آخر عمليات البحث</h2></div><div class="list-group list-group-flush">{% for job in recent %}<a class="list-group-item list-group-item-action d-flex justify-content-between" href="{{ url_for('search.results',job_id=job.id) }}"><span>{{ job.query_text }}</span><span class="status-pill status-{{ job.status }}">{{ job.status|ar_status }}</span></a>{% else %}<div class="empty-state">لا توجد عمليات بحث.</div>{% endfor %}</div></div>
+
+    <div class="panel-card">
+      <div class="panel-heading"><h2 class="h5 mb-0">آخر عمليات البحث</h2></div>
+      <div class="list-group list-group-flush">
+        {% for job in recent %}
+          <a class="list-group-item list-group-item-action d-flex justify-content-between gap-2" href="{{ url_for('search.results',job_id=job.id) }}">
+            <span class="text-truncate">{{ job.query_text }}</span>
+            <span class="status-pill status-{{ job.status }}">{{ job.status|ar_status }}</span>
+          </a>
+        {% else %}
+          <div class="empty-state">لا توجد عمليات بحث.</div>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script>document.getElementById('selectAllSearchAccounts')?.addEventListener('click',()=>{const b=[...document.querySelectorAll('.search-account-checkbox')],v=b.some(x=>!x.checked);b.forEach(x=>x.checked=v)});</script>{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('selectAllSearchAccounts')?.addEventListener('click', () => {
+  const boxes = [...document.querySelectorAll('.search-account-checkbox')];
+  const value = boxes.some(box => !box.checked);
+  boxes.forEach(box => { box.checked = value; });
+});
+</script>
+{% endblock %}
