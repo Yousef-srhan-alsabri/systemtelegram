@@ -57,3 +57,17 @@
 .mobile-sidebar-body .side-nav{grid-template-columns:1fr;padding-bottom:1rem}
 .mobile-sidebar-body .side-nav a{min-height:46px;transform:none!important}
 @media(max-width:575px){.mobile-sidebar-drawer{width:min(330px,94vw)}.mobile-sidebar-body .side-nav a{padding:.78rem .85rem}.permission-check{min-height:54px}}
+
+/* v7 information architecture */
+.grouped-nav{gap:.95rem}
+.nav-group{display:grid;gap:.32rem}
+.nav-group-label{color:#7fb2ee;font-size:.7rem;font-weight:800;letter-spacing:0;text-transform:none;padding:.15rem .85rem .05rem}
+.grouped-nav a{min-height:42px}
+.grouped-nav .nav-group:not(:last-child){padding-bottom:.4rem;border-bottom:1px solid rgba(255,255,255,.07)}
+.permission-groups{display:grid;gap:.85rem}
+.permission-groups.compact{max-height:min(56vh,520px);overflow:auto;padding-inline-end:.2rem;overscroll-behavior:contain}
+.permission-group{border:1px solid var(--line);border-radius:14px;background:#fbfdff;padding:.85rem}
+.permission-group-title{font-size:.86rem;font-weight:800;color:#1d4ed8;margin-bottom:.65rem}
+.permission-group .permissions-grid{gap:.55rem}
+.permission-group .permission-check{background:#fff}
+@media(max-width:575px){.permission-group{padding:.7rem}.permission-groups.compact{max-height:48vh}.grouped-nav{gap:.8rem}}

@@ -4,7 +4,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import Config
 from .extensions import db, login_manager, migrate
 from flask_login import current_user
-from .permissions import BLUEPRINT_PERMISSIONS, PERMISSION_SPECS
+from .permissions import BLUEPRINT_PERMISSIONS, PERMISSION_SPECS, grouped_permission_specs
 
 
 def create_app(config_object=Config):
@@ -123,7 +123,11 @@ def create_app(config_object=Config):
 
     @app.context_processor
     def inject_permissions():
-        data = {"permission_specs": PERMISSION_SPECS, "active_campaign_controls": []}
+        data = {
+            "permission_specs": PERMISSION_SPECS,
+            "permission_groups": grouped_permission_specs(),
+            "active_campaign_controls": [],
+        }
         try:
             if current_user.is_authenticated and current_user.has_permission("campaigns.manage"):
                 from .models import MessageCampaign

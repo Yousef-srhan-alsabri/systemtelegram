@@ -1,39 +1,58 @@
 {% extends 'base.html' %}
+{% block title %}المستخدمون والصلاحيات{% endblock %}
 {% block content %}
 <div class="page-header">
   <div>
     <span class="eyebrow">الإدارة</span>
     <h1>المستخدمون والصلاحيات</h1>
-    <p>إدارة الحسابات، الأدوار، التفعيل، كلمات المرور، وصلاحيات الوصول لكل قسم.</p>
+    <p>إدارة الحسابات والأدوار وحالة المستخدمين وصلاحيات الوصول لكل قسم.</p>
   </div>
 </div>
+
+{% macro permission_groups_fieldset(selected_permissions, compact=False, accordion_id='permissionsGroups') %}
+  <div class="permission-groups {% if compact %}compact{% endif %}" id="{{ accordion_id }}">
+    {% for group_label, rows in permission_groups %}
+      <section class="permission-group">
+        <div class="permission-group-title">{{ group_label }}</div>
+        <div class="permissions-grid">
+          {% for key,label,desc in rows %}
+            <label class="permission-check">
+              <input class="form-check-input" type="checkbox" name="permissions" value="{{ key }}" {% if key in selected_permissions %}checked{% endif %}>
+              <span><b>{{ label }}</b><small>{{ desc }}</small></span>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+{% endmacro %}
 
 <div class="row g-4">
   <div class="col-xl-4">
     <form method="post" action="{{ url_for('admin.create_user') }}" class="panel-card p-4">
       <h2 class="h5 mb-3">إضافة مستخدم</h2>
+
       <label class="form-label">البريد</label>
       <input class="form-control mb-3" type="email" name="email" required>
+
       <label class="form-label">كلمة المرور</label>
       <div class="password-field mb-3">
         <input id="newUserPassword" class="form-control" name="password" type="password" minlength="8" required>
-        <button type="button" class="password-toggle js-toggle-password" data-target="newUserPassword">👁️</button>
+        <button type="button" class="password-toggle js-toggle-password" data-target="newUserPassword" aria-label="إظهار كلمة المرور">
+          <i class="bi bi-eye"></i>
+        </button>
       </div>
+
       <label class="form-label">الدور</label>
       <select class="form-select mb-3" name="role">
         {% for role,label in role_labels.items() %}
           <option value="{{ role }}" {% if role == 'operator' %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <div class="permissions-grid compact mb-4">
-        {% for key,label,desc in permission_specs %}
-        <label class="permission-check">
-          <input class="form-check-input" type="checkbox" name="permissions" value="{{ key }}" {% if key in role_defaults['operator'] %}checked{% endif %}>
-          <span><b>{{ label }}</b><small>{{ desc }}</small></span>
-        </label>
-        {% endfor %}
-      </div>
-      <button class="btn btn-primary w-100">إنشاء المستخدم</button>
+
+      {{ permission_groups_fieldset(role_defaults['operator'], compact=True, accordion_id='newUserPermissionGroups') }}
+
+      <button class="btn btn-primary w-100 mt-4">إنشاء المستخدم</button>
     </form>
   </div>
 
@@ -42,84 +61,97 @@
       <div class="panel-heading">
         <h2 class="h5 mb-0">الحسابات الحالية</h2>
       </div>
+
       <div class="accordion accordion-flush" id="usersAccordion">
         {% for u in users %}
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="heading{{ u.id }}">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#user{{ u.id }}">
-              <div class="w-100 d-flex flex-wrap gap-2 justify-content-between align-items-center pe-3">
-                <span><b>{{ u.email }}</b><small class="d-block text-secondary">أنشئ: {{ u.created_at.strftime('%Y-%m-%d') }}</small></span>
-                <span class="d-flex gap-2 align-items-center">
-                  <span class="status-pill {{ 'status-active' if u.is_active else 'status-failed' }}">{{ 'مفعّل' if u.is_active else 'معطّل' }}</span>
-                  <span class="count-badge">{{ u.role_label }}</span>
-                </span>
-              </div>
-            </button>
-          </h2>
-          <div id="user{{ u.id }}" class="accordion-collapse collapse" data-bs-parent="#usersAccordion">
-            <div class="accordion-body">
-              <div class="row g-3">
-                <div class="col-lg-7">
-                  <form method="post" action="{{ url_for('admin.update_permissions', user_id=u.id) }}">
-                    <label class="form-label">الدور</label>
-                    <select class="form-select mb-3" name="role">
-                      {% for role,label in role_labels.items() %}
-                        <option value="{{ role }}" {% if u.role == role %}selected{% endif %}>{{ label }}</option>
-                      {% endfor %}
-                    </select>
-                    <div class="permissions-grid mb-3">
-                      {% set user_perms = u.permissions_set() %}
-                      {% for key,label,desc in permission_specs %}
-                      <label class="permission-check">
-                        <input class="form-check-input" type="checkbox" name="permissions" value="{{ key }}" {% if key in user_perms %}checked{% endif %}>
-                        <span><b>{{ label }}</b><small>{{ desc }}</small></span>
-                      </label>
-                      {% endfor %}
-                    </div>
-                    <button class="btn btn-outline-primary">حفظ الصلاحيات</button>
-                  </form>
+          {% set user_perms = u.permissions_set() %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ u.id }}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#user{{ u.id }}" aria-expanded="false" aria-controls="user{{ u.id }}">
+                <div class="w-100 d-flex flex-wrap gap-2 justify-content-between align-items-center pe-3">
+                  <span>
+                    <b>{{ u.email }}</b>
+                    <small class="d-block text-secondary">أنشئ: {{ u.created_at.strftime('%Y-%m-%d') }}</small>
+                  </span>
+                  <span class="d-flex gap-2 align-items-center">
+                    <span class="status-pill {{ 'status-active' if u.is_active else 'status-failed' }}">{{ 'مفعل' if u.is_active else 'معطل' }}</span>
+                    <span class="count-badge">{{ u.role_label }}</span>
+                  </span>
                 </div>
-                <div class="col-lg-5">
-                  <form class="panel-mini mb-3" method="post" action="{{ url_for('admin.reset_password',user_id=u.id) }}">
-                    <label class="form-label">تغيير كلمة المرور</label>
-                    <div class="password-field mb-2">
-                      <input id="pass{{ u.id }}" class="form-control" name="password" type="password" minlength="8" placeholder="كلمة مرور جديدة" required>
-                      <button type="button" class="password-toggle js-toggle-password" data-target="pass{{ u.id }}">👁️</button>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary">حفظ كلمة المرور</button>
-                  </form>
-                  <form method="post" action="{{ url_for('admin.update_status',user_id=u.id) }}" class="panel-mini">
-                    <label class="form-label">حالة المستخدم</label>
-                    {% if u.is_active %}
-                      <input type="hidden" name="action" value="disable">
-                      <button class="btn btn-sm btn-outline-danger" {% if u.id == current_user.id %}disabled{% endif %}>تعطيل المستخدم</button>
-                    {% else %}
-                      <input type="hidden" name="action" value="enable">
-                      <button class="btn btn-sm btn-outline-success">تفعيل المستخدم</button>
-                    {% endif %}
-                    {% if u.last_login_at %}<small class="d-block text-secondary mt-3">آخر دخول: {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }}</small>{% endif %}
-                    <small class="d-block text-secondary">محاولات فاشلة: {{ u.failed_login_count or 0 }}</small>
-                  </form>
+              </button>
+            </h2>
+
+            <div id="user{{ u.id }}" class="accordion-collapse collapse" data-bs-parent="#usersAccordion">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-lg-7">
+                    <form method="post" action="{{ url_for('admin.update_permissions', user_id=u.id) }}">
+                      <div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+                        <div class="flex-grow-1">
+                          <label class="form-label">الدور</label>
+                          <select class="form-select" name="role">
+                            {% for role,label in role_labels.items() %}
+                              <option value="{{ role }}" {% if u.role == role %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <button class="btn btn-outline-primary">حفظ الصلاحيات</button>
+                      </div>
+
+                      {{ permission_groups_fieldset(user_perms, accordion_id='permissionGroups' ~ u.id) }}
+                    </form>
+                  </div>
+
+                  <div class="col-lg-5">
+                    <form class="panel-mini mb-3" method="post" action="{{ url_for('admin.reset_password',user_id=u.id) }}">
+                      <label class="form-label">تغيير كلمة المرور</label>
+                      <div class="password-field mb-2">
+                        <input id="pass{{ u.id }}" class="form-control" name="password" type="password" minlength="8" placeholder="كلمة مرور جديدة" required>
+                        <button type="button" class="password-toggle js-toggle-password" data-target="pass{{ u.id }}" aria-label="إظهار كلمة المرور">
+                          <i class="bi bi-eye"></i>
+                        </button>
+                      </div>
+                      <button class="btn btn-sm btn-outline-primary">حفظ كلمة المرور</button>
+                    </form>
+
+                    <form method="post" action="{{ url_for('admin.update_status',user_id=u.id) }}" class="panel-mini">
+                      <label class="form-label">حالة المستخدم</label>
+                      {% if u.is_active %}
+                        <input type="hidden" name="action" value="disable">
+                        <button class="btn btn-sm btn-outline-danger" {% if u.id == current_user.id %}disabled{% endif %}>تعطيل المستخدم</button>
+                      {% else %}
+                        <input type="hidden" name="action" value="enable">
+                        <button class="btn btn-sm btn-outline-success">تفعيل المستخدم</button>
+                      {% endif %}
+                      {% if u.last_login_at %}
+                        <small class="d-block text-secondary mt-3">آخر دخول: {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                      {% endif %}
+                      <small class="d-block text-secondary">محاولات فاشلة: {{ u.failed_login_count or 0 }}</small>
+                    </form>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        {% else %}
+          <div class="empty-state">لا توجد حسابات مستخدمين.</div>
         {% endfor %}
       </div>
     </div>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 document.querySelectorAll('.js-toggle-password').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById(btn.dataset.target);
-    if (!input) return;
+    const icon = btn.querySelector('i');
+    if (!input || !icon) return;
     const show = input.type === 'password';
     input.type = show ? 'text' : 'password';
-    btn.textContent = show ? '🙈' : '👁️';
+    icon.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
   });
 });
 </script>
