@@ -944,6 +944,14 @@ def _pdf_escape(value):
     return str(value or "").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
+def _is_whatsapp_group_link(link):
+    try:
+        from urllib.parse import urlsplit
+        return (urlsplit(link.url).hostname or "").lower() in {"chat.whatsapp.com", "www.chat.whatsapp.com"}
+    except Exception:
+        return False
+
+
 def _write_simple_links_pdf(path, title, lines):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     pages = []
@@ -1077,7 +1085,7 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
                         if job.start_date and message_date and message_date < job.start_date:
                             break
                         job.messages_scanned += 1
-                        links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp"]
+                        links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp" and _is_whatsapp_group_link(item)]
                         if not links:
                             continue
                         job.links_found += len(links)
@@ -1125,9 +1133,9 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
         export_lines.append("")
 
     if job.export_mode in {"pdf", "both"}:
-        filename = f"whatsapp-links-{job.id}.pdf"
+        filename = f"whatsapp-group-links-{job.id}.pdf"
         path = os.path.join(current_app.instance_path, "exports", filename)
-        _write_simple_links_pdf(path, f"WhatsApp links scan #{job.id}", export_lines or ["No WhatsApp links found."])
+        _write_simple_links_pdf(path, f"WhatsApp group links scan #{job.id}", export_lines or ["No WhatsApp group links found."])
         job.pdf_path = path
         db.session.commit()
 
@@ -1138,9 +1146,9 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
             try:
                 await client.connect()
                 entity = await client.get_entity(job.export_channel_ref)
-                header = f"WhatsApp links scan #{job.id}\nUnique links: {len(links)}\n"
+                header = f"WhatsApp group links scan #{job.id}\nUnique group links: {len(links)}\n"
                 chunks, current = [], header + "\n"
-                for line in export_lines or ["No WhatsApp links found."]:
+                for line in export_lines or ["No WhatsApp group links found."]:
                     addition = line + "\n"
                     if len(current) + len(addition) > 3500:
                         chunks.append(current.strip())

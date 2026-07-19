@@ -124,28 +124,63 @@
 </div>
 
 <script>
+let joinSelectionRun = 0;
+
+function linkMatchesMode(box, mode) {
+  if (box.disabled || mode === 'none') return false;
+  const type = box.dataset.type;
+  const invite = box.dataset.invite === '1';
+  const approval = box.dataset.approval === '1';
+  return mode === 'all' ||
+    (mode === 'groups' && type === 'group') ||
+    (mode === 'channels' && type === 'channel') ||
+    (mode === 'invites' && invite) ||
+    (mode === 'approval' && approval);
+}
+
+function setJoinSelectionBusy(busy) {
+  [
+    'selectAllLinksBtn',
+    'selectGroupsBtn',
+    'selectChannelsBtn',
+    'selectInvitesBtn',
+    'selectApprovalBtn',
+    'clearLinksBtn',
+  ].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.classList.toggle('is-loading', busy);
+  });
+}
+
 function selectJoinLinks(mode) {
-  const boxes = document.querySelectorAll('.join-link-check');
-  for (const box of boxes) {
-    if (box.disabled) {
-      box.checked = false;
-      continue;
+  const runId = ++joinSelectionRun;
+  const boxes = Array.from(document.querySelectorAll('.join-link-check'));
+  const toggleAll = document.getElementById('toggleAllJoinLinks');
+  const batchSize = 80;
+  let index = 0;
+
+  setJoinSelectionBusy(true);
+
+  function applyBatch() {
+    if (runId !== joinSelectionRun) return;
+    const end = Math.min(index + batchSize, boxes.length);
+    for (; index < end; index += 1) {
+      boxes[index].checked = linkMatchesMode(boxes[index], mode);
     }
-    const type = box.dataset.type;
-    const invite = box.dataset.invite === '1';
-    const approval = box.dataset.approval === '1';
-    box.checked = mode === 'all' ||
-      (mode === 'groups' && type === 'group') ||
-      (mode === 'channels' && type === 'channel') ||
-      (mode === 'invites' && invite) ||
-      (mode === 'approval' && approval);
-    if (mode === 'none') box.checked = false;
+    if (index < boxes.length) {
+      window.requestAnimationFrame(applyBatch);
+      return;
+    }
+    if (toggleAll) {
+      toggleAll.checked = mode === 'all';
+      toggleAll.indeterminate = false;
+    }
+    setJoinSelectionBusy(false);
   }
 
-  const toggleAll = document.getElementById('toggleAllJoinLinks');
-  if (toggleAll) {
-    toggleAll.checked = mode === 'all';
-  }
+  window.requestAnimationFrame(applyBatch);
 }
 
 function selectJoinAccounts(mode) {

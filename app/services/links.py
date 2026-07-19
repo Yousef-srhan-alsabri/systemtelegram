@@ -33,7 +33,7 @@ def classify(url):
     host = (urlsplit(url).hostname or "").lower()
     if host in {"t.me", "telegram.me", "www.telegram.me"}:
         return "telegram"
-    if host in {"chat.whatsapp.com", "wa.me", "www.wa.me"}:
+    if host in {"chat.whatsapp.com", "www.chat.whatsapp.com"}:
         return "whatsapp"
     return "other"
 

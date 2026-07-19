@@ -19,9 +19,9 @@ PERMISSION_LABELS = {key: label for key, label, _ in PERMISSION_SPECS}
 ALL_PERMISSIONS = [key for key, _, _ in PERMISSION_SPECS]
 PERMISSION_SPECS.insert(
     10,
-    ("whatsapp.extract", "استخراج روابط واتساب", "استخراج روابط واتساب من القروبات والقنوات وتصديرها إلى PDF أو قناة"),
+    ("whatsapp.extract", "استخراج قروبات واتساب", "استخراج روابط دعوة قروبات واتساب من القروبات والقنوات وتصديرها إلى PDF أو قناة"),
 )
-PERMISSION_LABELS["whatsapp.extract"] = "استخراج روابط واتساب"
+PERMISSION_LABELS["whatsapp.extract"] = "استخراج قروبات واتساب"
 ALL_PERMISSIONS.insert(10, "whatsapp.extract")
 
 ROLE_LABELS = {
