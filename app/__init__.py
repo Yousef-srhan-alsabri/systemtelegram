@@ -127,14 +127,25 @@ def create_app(config_object=Config):
             "permission_specs": PERMISSION_SPECS,
             "permission_groups": grouped_permission_specs(),
             "active_campaign_controls": [],
+            "active_join_controls": [],
+            "active_publish_controls": [],
         }
         try:
-            if current_user.is_authenticated and current_user.has_permission("campaigns.manage"):
-                from .models import MessageCampaign
-                data["active_campaign_controls"] = MessageCampaign.query.filter(
-                    MessageCampaign.owner_id == current_user.id,
-                    MessageCampaign.status.in_(["queued", "running", "paused", "pause_requested", "paused_rate_limit", "scheduled", "risk_hold", "finished_with_issues"])
-                ).order_by(MessageCampaign.id.desc()).limit(3).all()
+            if current_user.is_authenticated:
+                from .models import ChannelPost, JoinJob, MessageCampaign
+                if current_user.has_permission("campaigns.manage"):
+                    data["active_campaign_controls"] = MessageCampaign.query.filter(
+                        MessageCampaign.owner_id == current_user.id,
+                        MessageCampaign.status.in_(["queued", "running", "paused", "pause_requested", "paused_rate_limit", "scheduled", "risk_hold", "finished_with_issues"])
+                    ).order_by(MessageCampaign.id.desc()).limit(3).all()
+                data["active_join_controls"] = JoinJob.query.filter(
+                    JoinJob.owner_id == current_user.id,
+                    JoinJob.status.in_(["queued", "running", "paused", "stopped", "paused_rate_limit"])
+                ).order_by(JoinJob.id.desc()).limit(4).all()
+                data["active_publish_controls"] = ChannelPost.query.filter(
+                    ChannelPost.owner_id == current_user.id,
+                    ChannelPost.status.in_(["scheduled", "publishing"])
+                ).order_by(ChannelPost.id.desc()).limit(3).all()
         except Exception:
             pass
         return data

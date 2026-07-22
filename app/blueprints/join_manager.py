@@ -1,4 +1,8 @@
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+import csv
+import io
+import random
+
+from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.background import submit_job
@@ -12,6 +16,7 @@ from app.models import (
     JoinSource,
     SearchJob,
     TelegramAccount,
+    WhatsAppLink,
 )
 from app.services.audit import log_action
 from app.services.discovery import parse_telegram_link
@@ -40,7 +45,7 @@ def _dedupe_by_hash(rows):
     return result
 
 
-def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max_items: int):
+def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max_items: int, link_order: str = "newest"):
     """Return link rows from the owner's global discovered pool.
 
     The returned rows are used as a source pool and are cloned per target account.
@@ -70,8 +75,12 @@ def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max
         return []
 
     # Pull more than max_items because duplicate URLs may exist for different accounts.
-    rows = query.order_by(DiscoveredJoinLink.id.desc()).limit(max_items * 5).all()
-    return _dedupe_by_hash(rows)[:max_items]
+    order_column = DiscoveredJoinLink.id.asc() if link_order == "oldest" else DiscoveredJoinLink.id.desc()
+    rows = query.order_by(order_column).limit(max_items * 5).all()
+    rows = _dedupe_by_hash(rows)
+    if link_order == "random":
+        random.shuffle(rows)
+    return rows[:max_items]
 
 
 def _ensure_link_for_account(owner_id: int, account_id: int, source: DiscoveredJoinLink) -> DiscoveredJoinLink:
@@ -145,6 +154,27 @@ def index():
         resume_after_floodwait=get_bool(current_user.id, "JOIN_RESUME_AFTER_FLOODWAIT", current_app.config.get("JOIN_RESUME_AFTER_FLOODWAIT", True)),
         max_floodwait_sleep=get_int(current_user.id, "JOIN_MAX_FLOODWAIT_SLEEP_SECONDS", current_app.config.get("JOIN_MAX_FLOODWAIT_SLEEP_SECONDS", 3600)),
     )
+
+
+@bp.get("/exports/<string:link_kind>.csv")
+@login_required
+def export_links_csv(link_kind):
+    """Download independently filtered Telegram or WhatsApp link inventories."""
+    stream = io.StringIO(newline="")
+    writer = csv.writer(stream)
+    writer.writerow(["link", "type", "status", "title", "source", "date"])
+    if link_kind == "telegram":
+        rows = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id).order_by(DiscoveredJoinLink.id.desc()).all()
+        for row in rows:
+            writer.writerow([row.url, row.entity_type or "", row.status, row.entity_title or "", row.source_message_url or "", row.checked_at or ""])
+    elif link_kind == "whatsapp":
+        rows = WhatsAppLink.query.filter_by(owner_id=current_user.id).order_by(WhatsAppLink.id.desc()).all()
+        for row in rows:
+            writer.writerow([row.url, "whatsapp_group", "discovered", row.source_title or "", row.source_message_url or "", row.message_date or ""])
+    else:
+        return Response("Unknown export type", status=404)
+    filename = f"{link_kind}-links.csv"
+    return Response(stream.getvalue().encode("utf-8-sig"), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @bp.post("/sources")
@@ -233,6 +263,12 @@ def execute():
         account_ids.append(single_account_id)
 
     join_mode = request.form.get("join_mode", "selected")
+    distribution_mode = request.form.get("distribution_mode", "shared")
+    link_order = request.form.get("link_order", "newest")
+    if distribution_mode not in {"shared", "round_robin", "chunks"}:
+        distribution_mode = "shared"
+    if link_order not in {"newest", "oldest", "random"}:
+        link_order = "newest"
     selected_ids = [int(v) for v in request.form.getlist("link_ids") if v.isdigit()]
     max_items = get_int(current_user.id, "JOIN_MAX_ITEMS_PER_JOB", current_app.config["JOIN_MAX_ITEMS_PER_JOB"])
 
@@ -246,7 +282,8 @@ def execute():
         flash("اختر حساباً نشطاً واحداً على الأقل", "danger")
         return redirect(url_for("join_manager.index"))
 
-    source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, max_items)
+    pool_size = max_items if distribution_mode == "shared" else max_items * len(accounts)
+    source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, pool_size, link_order)
     if not source_rows:
         flash("لا توجد روابط صالحة حسب الخيار المحدد. افحص الروابط أولاً أو غيّر خيار الانضمام.", "danger")
         return redirect(url_for("join_manager.index"))
@@ -259,9 +296,19 @@ def execute():
         auto_continue = False
         max_batches = 1
 
+    assignments = {}
+    for index, account in enumerate(accounts):
+        if distribution_mode == "shared":
+            chosen = source_rows[:max_items]
+        elif distribution_mode == "chunks":
+            chosen = source_rows[index * max_items:(index + 1) * max_items]
+        else:
+            chosen = source_rows[index::len(accounts)][:max_items]
+        assignments[account.id] = chosen
+
     created_jobs = []
     for account in accounts:
-        account_rows = [_ensure_link_for_account(current_user.id, account.id, row) for row in source_rows]
+        account_rows = [_ensure_link_for_account(current_user.id, account.id, row) for row in assignments[account.id]]
         if not account_rows:
             continue
         job = JoinJob(
@@ -286,7 +333,7 @@ def execute():
     log_action(
         "join_jobs.started_multi_account",
         "join_job",
-        details=f"mode={join_mode}; accounts={len(created_jobs)}; batch_count={len(source_rows)}; auto_continue={auto_continue}; pause={batch_pause_seconds}; max_batches={max_batches}",
+        details=f"mode={join_mode}; order={link_order}; distribution={distribution_mode}; accounts={len(created_jobs)}; pool={len(source_rows)}; auto_continue={auto_continue}; pause={batch_pause_seconds}; max_batches={max_batches}",
     )
     db.session.commit()
 

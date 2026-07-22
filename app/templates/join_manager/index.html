@@ -16,6 +16,14 @@
   <div class="col-6 col-xl-3"><div class="stat-card"><span>تحتاج موافقة</span><strong>{{ join_stats.approval_required }}</strong></div></div>
 </div>
 
+<div class="panel-card p-3 mb-4 export-toolbar">
+  <div><strong>تصدير الرابطـات</strong><small class="d-block text-muted">ملف مستقل حسب المصدر والنوع، مناسب للفرز والمراجعة.</small></div>
+  <div class="action-row">
+    <a class="btn btn-outline-primary" href="{{ url_for('join_manager.export_links_csv', link_kind='telegram') }}"><i class="bi bi-telegram"></i> تصدير Telegram</a>
+    <a class="btn btn-outline-success" href="{{ url_for('join_manager.export_links_csv', link_kind='whatsapp') }}"><i class="bi bi-whatsapp"></i> تصدير WhatsApp</a>
+  </div>
+</div>
+
 <ul class="nav nav-pills app-tabs mb-3" role="tablist">
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#joinSourcesTab" type="button">المصادر</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#joinExecuteTab" type="button">تنفيذ الانضمام</button></li>
@@ -85,6 +93,22 @@
             <button type="button" id="selectAllAccountsBtn" class="btn btn-sm btn-outline-primary">تحديد الحسابات</button>
             <button type="button" id="clearAccountsBtn" class="btn btn-sm btn-outline-secondary">إلغاء الحسابات</button>
           </div>
+        </div>
+
+        <div>
+          <label class="form-label">ترتيب روابط الحملة</label>
+          <select class="form-select" name="link_order" id="linkOrder">
+            <option value="newest">الأحدث في قناة الروابط أولاً</option>
+            <option value="oldest">الأقدم في قناة الروابط أولاً</option>
+            <option value="random">ترتيب عشوائي</option>
+          </select>
+          <label class="form-label mt-3">توزيع الحسابات</label>
+          <select class="form-select" name="distribution_mode" id="distributionMode">
+            <option value="shared">كل الحسابات تنضم لنفس الروابط</option>
+            <option value="round_robin">توزيع متوازن بلا تكرار</option>
+            <option value="chunks">دفعات متتالية بلا تكرار</option>
+          </select>
+          <div class="join-mode-note mt-2" id="distributionHint">كل حساب سيعمل على نفس الروابط المختارة.</div>
         </div>
 
         <div>
@@ -322,6 +346,16 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', updateSelectedLinksCount));
   document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
     if (!confirmJoinMode()) event.preventDefault();
+  });
+  const distribution = document.getElementById('distributionMode');
+  const distributionHint = document.getElementById('distributionHint');
+  distribution?.addEventListener('change', () => {
+    const hints = {
+      shared: 'كل حساب سيعمل على نفس الروابط المختارة.',
+      round_robin: 'تقسيم متوازن: لا يتكرر الرابط بين الحسابات في هذه الحملة.',
+      chunks: 'تقسيم متتالٍ: كل حساب يأخذ جزءاً مستقلاً من الروابط حسب الترتيب.'
+    };
+    if (distributionHint) distributionHint.textContent = hints[distribution.value];
   });
   updateSelectedLinksCount();
 });

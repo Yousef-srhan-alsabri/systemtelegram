@@ -144,11 +144,11 @@
 </div>
 {% endif %}
 
-{% if active_campaign_controls %}
+{% if active_campaign_controls or active_join_controls or active_publish_controls %}
 <button class="campaign-control-fab" type="button" data-bs-toggle="offcanvas" data-bs-target="#campaignControlDrawer" aria-controls="campaignControlDrawer" aria-label="فتح مركز الحملات النشطة">
   <span class="fab-icon"><i class="bi bi-lightning-charge-fill"></i></span>
   <span class="fab-text">الحملات النشطة</span>
-  <span class="fab-count">{{ active_campaign_controls|length }}</span>
+  <span class="fab-count">{{ active_campaign_controls|length + active_join_controls|length + active_publish_controls|length }}</span>
 </button>
 <div class="offcanvas offcanvas-end campaign-control-drawer" tabindex="-1" id="campaignControlDrawer" aria-labelledby="campaignControlDrawerLabel">
   <div class="offcanvas-header">
@@ -174,6 +174,15 @@
             <form method="post" action="{{ url_for('messages.campaign_resume', campaign_id=c.id) }}"><button class="btn btn-sm btn-success w-100">استئناف</button></form>
           </div>
         </div>
+      {% endfor %}
+      {% for job in active_join_controls %}
+        <div class="drawer-campaign-card">
+          <div class="d-flex justify-content-between align-items-start gap-2"><div><div class="eyebrow"><i class="bi bi-person-plus"></i> انضمام</div><strong>مهمة #{{ job.id }} · حساب {{ job.account_id }}</strong><div class="mt-2"><span class="status-pill status-{{ job.status }}">{{ job.status|ar_status }}</span><small class="d-block text-muted mt-1">{{ job.joined_count }} انضم · {{ job.failed_count }} فشل · {{ job.total_links }} رابط</small></div></div><a class="btn btn-sm btn-light" href="{{ url_for('join_manager.job_detail', job_id=job.id) }}"><i class="bi bi-activity"></i></a></div>
+          <div class="drawer-actions mt-3"><form method="post" action="{{ url_for('join_manager.job_pause', job_id=job.id) }}"><button class="btn btn-sm btn-warning w-100"><i class="bi bi-pause-fill"></i> إيقاف</button></form><form method="post" action="{{ url_for('join_manager.job_resume', job_id=job.id) }}"><button class="btn btn-sm btn-success w-100"><i class="bi bi-play-fill"></i> استئناف</button></form></div>
+        </div>
+      {% endfor %}
+      {% for post in active_publish_controls %}
+        <div class="drawer-campaign-card"><div class="d-flex justify-content-between gap-2"><div><div class="eyebrow"><i class="bi bi-send"></i> نشر قناة</div><strong>{{ post.title or ('منشور #' ~ post.id) }}</strong><div class="mt-2"><span class="status-pill status-{{ post.status }}">{{ post.status|ar_status }}</span></div></div><a class="btn btn-sm btn-light" href="{{ url_for('channel.dashboard') }}"><i class="bi bi-box-arrow-up-right"></i></a></div></div>
       {% endfor %}
     </div>
   </div>

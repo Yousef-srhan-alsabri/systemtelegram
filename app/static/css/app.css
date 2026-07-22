@@ -79,7 +79,7 @@
 .app-tabs .nav-link.active .count-badge{background:rgba(255,255,255,.18);color:#fff}
 .action-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .action-row form{display:inline-flex;margin:0}
-.join-command-panel{display:grid;grid-template-columns:1.1fr 1fr auto;gap:1rem;padding:1rem;border-bottom:1px solid var(--line);background:#fbfdff}
+.join-command-panel{display:grid;grid-template-columns:1.1fr 1fr 1fr auto;gap:1rem;padding:1rem;border-bottom:1px solid var(--line);background:#fbfdff}
 .join-mode-note{font-size:.84rem;color:var(--muted);background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:.65rem}
 .selection-toolbar{position:sticky;top:78px;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.85rem 1rem;border-bottom:1px solid var(--line);background:rgba(255,255,255,.96);backdrop-filter:blur(10px)}
 .selection-summary{display:flex;align-items:center;gap:.6rem;white-space:nowrap}
