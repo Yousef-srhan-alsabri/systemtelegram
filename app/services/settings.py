@@ -29,6 +29,8 @@ SETTING_SPECS = {
     "JOIN_RESUME_AFTER_FLOODWAIT": {"label": "استئناف الانضمام تلقائياً بعد انتهاء حد تيليجرام", "type": "bool", "default": "true", "group": "join"},
     "JOIN_MAX_FLOODWAIT_SLEEP_SECONDS": {"label": "أقصى انتظار تلقائي لحد تيليجرام بالثواني", "type": "int", "default": "3600", "group": "join"},
     "JOIN_DYNAMIC_MONITOR_SECONDS": {"label": "فاصل مراقبة استئناف الانضمام", "type": "int", "default": "60", "group": "join"},
+    "JOIN_INSPECT_DELAY_MIN_SECONDS": {"label": "أقل تأخير بين فحوص روابط الانضمام", "type": "int", "default": "2", "group": "join"},
+    "JOIN_INSPECT_DELAY_MAX_SECONDS": {"label": "أعلى تأخير بين فحوص روابط الانضمام", "type": "int", "default": "4", "group": "join"},
     "SEARCH_JOINED_DIALOG_LIMIT": {"label": "حد المحادثات المفحوصة في البحث المحلي", "type": "int", "default": "500", "group": "search"},
 }
 

@@ -680,7 +680,10 @@ async def _execute_search_job(job_id):
 
             dialogs = []
             member_ids = set()
-            if include_joined or include_global:
+            # A global search does not need the account's dialog list.  Loading it
+            # made "global only" appear to search local chats first (and delayed
+            # the actual Telegram-wide request on large accounts).
+            if include_joined:
                 try:
                     dialog_limit = max(50, min(
                         get_int(job.owner_id, "SEARCH_JOINED_DIALOG_LIMIT", current_app.config.get("SEARCH_JOINED_DIALOG_LIMIT", 500)),
@@ -1242,12 +1245,26 @@ async def _scan_join_source(scan_job_id):
                     db.session.add(row)
                     db.session.flush()
                     unique += 1
-                await _inspect_join_link(client, row)
-                db.session.commit()
+                # Telegram throttles invite checks aggressively.  Keep a small,
+                # configurable gap and retry rate limits instead of marking links
+                # as failed merely because the account must wait.
+                while True:
+                    try:
+                        await _inspect_join_link(client, row)
+                        db.session.commit()
+                        break
+                    except FloodWaitError as exc:
+                        scan.error_text = f"Telegram rate limit; continuing after {exc.seconds}s"
+                        db.session.commit()
+                        await asyncio.sleep(max(1, int(exc.seconds)))
+                low = max(0.0, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
+                high = max(low, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
+                await asyncio.sleep(random.uniform(low, high))
         source.last_scanned_message_id = max_message_id
         scan.links_found = found
         scan.unique_links = unique
         scan.status = "completed"
+        scan.error_text = None
         scan.completed_at = utcnow()
         db.session.commit()
         return {"status": "completed", "unique": unique}
@@ -1300,6 +1317,12 @@ async def _inspect_join_link(client, row):
         row.status = "invalid"
     except ChannelPrivateError:
         row.status = "private_inaccessible"
+    except FloodWaitError:
+        # This is a temporary Telegram throttle, never a bad link.  The caller
+        # pauses and retries it without exposing a false "check failed" result.
+        row.status = "discovered"
+        row.error_text = None
+        raise
     except Exception as exc:
         row.status = "check_failed"
         row.error_text = type(exc).__name__
@@ -1643,9 +1666,21 @@ async def _inspect_join_links(account_id, link_ids):
     client = _account_client(account)
     try:
         await client.connect()
-        for row in rows:
-            await _inspect_join_link(client, row)
-            db.session.commit()
+        for index, row in enumerate(rows):
+            while True:
+                try:
+                    await _inspect_join_link(client, row)
+                    db.session.commit()
+                    break
+                except FloodWaitError as exc:
+                    row.status = "discovered"
+                    row.error_text = f"Telegram rate limit: retrying in {exc.seconds}s"
+                    db.session.commit()
+                    await asyncio.sleep(max(1, int(exc.seconds)))
+            if index < len(rows) - 1:
+                low = max(0.0, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
+                high = max(low, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
+                await asyncio.sleep(random.uniform(low, high))
         return {"status": "completed", "count": len(rows)}
     finally:
         await client.disconnect()

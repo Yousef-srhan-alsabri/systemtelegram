@@ -31,8 +31,8 @@
         <div>
           <label class="form-label">نطاق البحث</label>
           <select class="form-select" name="search_scope">
-            <option value="global_plus_joined" {% if default_scope=='global_plus_joined' %}selected{% endif %}>عام + حساباتي</option>
-            <option value="global_only" {% if default_scope=='global_only' %}selected{% endif %}>عام فقط</option>
+            <option value="global_only" {% if default_scope=='global_only' %}selected{% endif %}>بحث عام في Telegram فقط</option>
+            <option value="global_plus_joined" {% if default_scope=='global_plus_joined' %}selected{% endif %}>بحث عام + حساباتي</option>
             <option value="joined_only" {% if default_scope=='joined_only' %}selected{% endif %}>داخل حساباتي فقط</option>
           </select>
         </div>

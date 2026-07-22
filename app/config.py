@@ -57,7 +57,9 @@ class Config:
     SEARCH_DEFAULT_MAX_RESULTS = int(os.getenv("SEARCH_DEFAULT_MAX_RESULTS", "250"))
     SEARCH_MAX_RESULTS = int(os.getenv("SEARCH_MAX_RESULTS", "1000"))
     SEARCH_SAUDI_THRESHOLD = int(os.getenv("SEARCH_SAUDI_THRESHOLD", "25"))
-    SEARCH_SCOPE_DEFAULT = os.getenv("SEARCH_SCOPE_DEFAULT", "global_plus_joined").strip()
+    # Discovery should mean Telegram-wide discovery by default.  The user can
+    # explicitly choose the account-local scope when that is desired.
+    SEARCH_SCOPE_DEFAULT = os.getenv("SEARCH_SCOPE_DEFAULT", "global_only").strip()
     SEARCH_INCLUDE_PUBLIC_MESSAGES = os.getenv("SEARCH_INCLUDE_PUBLIC_MESSAGES", "true").lower() in {"1", "true", "yes", "on"}
     SEARCH_GLOBAL_LIMIT = int(os.getenv("SEARCH_GLOBAL_LIMIT", "100"))
     # Avoid loading an unbounded Telegram dialog history before a search starts.
@@ -72,3 +74,5 @@ class Config:
     JOIN_RESUME_AFTER_FLOODWAIT = os.getenv("JOIN_RESUME_AFTER_FLOODWAIT", "true").lower() in {"1", "true", "yes", "on"}
     JOIN_MAX_FLOODWAIT_SLEEP_SECONDS = int(os.getenv("JOIN_MAX_FLOODWAIT_SLEEP_SECONDS", "3600"))
     JOIN_DYNAMIC_MONITOR_SECONDS = int(os.getenv("JOIN_DYNAMIC_MONITOR_SECONDS", "60"))
+    JOIN_INSPECT_DELAY_MIN_SECONDS = float(os.getenv("JOIN_INSPECT_DELAY_MIN_SECONDS", "2"))
+    JOIN_INSPECT_DELAY_MAX_SECONDS = float(os.getenv("JOIN_INSPECT_DELAY_MAX_SECONDS", "4"))
