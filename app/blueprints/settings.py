@@ -23,7 +23,11 @@ def index():
                 raw = request.form.get(key, "").strip()
             if spec["type"] == "int":
                 try:
-                    val = int(raw)
+                    # Accept legacy values such as "2.0" while storing them as
+                    # clean integer settings for the delay fields.
+                    val = int(float(raw))
+                    if float(raw) != val:
+                        raise ValueError
                 except ValueError:
                     flash(f"القيمة غير صحيحة: {spec['label']}", "danger")
                     return redirect(url_for("settings.index"))
