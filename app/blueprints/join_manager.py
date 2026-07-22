@@ -318,7 +318,8 @@ def execute():
     batch_pause_seconds = get_int(current_user.id, "JOIN_BATCH_PAUSE_SECONDS", current_app.config.get("JOIN_BATCH_PAUSE_SECONDS", 300))
     max_batches = get_int(current_user.id, "JOIN_MAX_BATCHES_PER_RUN", current_app.config.get("JOIN_MAX_BATCHES_PER_RUN", 5))
     if join_mode == "selected":
-        # Selected mode should only execute exactly what the user marked.
+        # A selected job must never pick unrelated links in a following batch.
+        # FloodWait monitoring/resume remains enabled independently in the worker.
         auto_continue = False
         max_batches = 1
 

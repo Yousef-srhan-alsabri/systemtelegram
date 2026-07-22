@@ -277,12 +277,12 @@ function updateSelectedAccountsCount() {
   if (label) label.textContent = `${count} حساب${count === 1 ? '' : 'ات'} محدد`;
 }
 
-function updateSelectedLinksCount() {
+function updateSelectedLinksCount(keepExecutionMode = false) {
   const count = document.querySelectorAll('.join-link-check:checked').length;
   const label = document.getElementById('selectedLinksCount');
   const mode = document.getElementById('joinMode');
   if (label) label.textContent = count + ' محدد';
-  if (count > 0 && mode) mode.value = 'selected';
+  if (count > 0 && mode && !keepExecutionMode) mode.value = 'selected';
 }
 
 function setJoinSelectionBusy(busy) {
@@ -321,7 +321,7 @@ function selectJoinLinks(mode, keepExecutionMode = false) {
       toggleAll.checked = mode === 'all';
       toggleAll.indeterminate = false;
     }
-    updateSelectedLinksCount();
+    updateSelectedLinksCount(keepExecutionMode);
     setJoinSelectionBusy(false);
   }
   if (window.requestIdleCallback) window.requestIdleCallback(applyBatch, { timeout: 80 });
@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // "selected" is deliberately left untouched so manual selections remain.
     if (map[event.target.value]) selectJoinLinks(map[event.target.value], true);
   });
-  document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', updateSelectedLinksCount));
+  document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', () => updateSelectedLinksCount(false)));
   document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
     if (!confirmJoinMode()) event.preventDefault();
   });
