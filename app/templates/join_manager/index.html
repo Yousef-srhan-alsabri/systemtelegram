@@ -113,6 +113,15 @@
         </div>
 
         <div>
+          <label class="form-label">مصادر الروابط</label>
+          <select class="form-select" name="source_ids" multiple size="4">
+            {% for s in sources %}<option value="{{ s.id }}">{{ s.source_channel_title or s.source_channel_ref }}</option>{% endfor %}
+          </select>
+          <label class="source-mode-pill d-flex mt-2"><input class="form-check-input me-2" type="checkbox" name="include_imported" value="1" checked> تضمين الروابط المستوردة من البحث</label>
+          <div class="join-mode-note mt-2">اترك المصادر بلا اختيار لاستخدام كل قنوات المصادر.</div>
+        </div>
+
+        <div>
           <label class="form-label">طريقة التنفيذ</label>
           <select class="form-select" name="join_mode" id="joinMode">
             <option value="selected">الروابط المحددة في الجدول</option>

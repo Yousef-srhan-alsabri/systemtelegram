@@ -45,7 +45,7 @@ def _dedupe_by_hash(rows):
     return result
 
 
-def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max_items: int, link_order: str = "newest"):
+def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max_items: int, link_order: str = "newest", source_ids: list[int] | None = None, include_imported: bool = True):
     """Return link rows from the owner's global discovered pool.
 
     The returned rows are used as a source pool and are cloned per target account.
@@ -56,6 +56,12 @@ def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max
         DiscoveredJoinLink.owner_id == owner_id,
         DiscoveredJoinLink.status.in_(JOINABLE_POOL_STATUSES),
     )
+    if source_ids:
+        # Links obtained from a source channel are tied to its scan job.  Keep
+        # search-imported links optional because they have no JoinScanJob.
+        query = query.join(JoinScanJob, DiscoveredJoinLink.scan_job_id == JoinScanJob.id).filter(JoinScanJob.source_id.in_(source_ids))
+    elif not include_imported:
+        query = query.filter(DiscoveredJoinLink.scan_job_id.isnot(None))
 
     if mode == "selected":
         if not selected_ids:
@@ -281,6 +287,8 @@ def execute():
         account_ids.append(single_account_id)
 
     join_mode = request.form.get("join_mode", "selected")
+    source_ids = [int(v) for v in request.form.getlist("source_ids") if str(v).isdigit()]
+    include_imported = request.form.get("include_imported") == "1"
     distribution_mode = request.form.get("distribution_mode", "shared")
     link_order = request.form.get("link_order", "newest")
     if distribution_mode not in {"shared", "round_robin", "chunks"}:
@@ -301,7 +309,7 @@ def execute():
         return redirect(url_for("join_manager.index"))
 
     pool_size = max_items if distribution_mode == "shared" else max_items * len(accounts)
-    source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, pool_size, link_order)
+    source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, pool_size, link_order, source_ids, include_imported)
     if not source_rows:
         flash("لا توجد روابط صالحة حسب الخيار المحدد. افحص الروابط أولاً أو غيّر خيار الانضمام.", "danger")
         return redirect(url_for("join_manager.index"))
