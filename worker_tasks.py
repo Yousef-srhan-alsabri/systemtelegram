@@ -1240,7 +1240,11 @@ async def _scan_join_source(scan_job_id):
         entity = await client.get_entity(source.source_channel_ref)
         source.source_channel_id = int(getattr(entity, "id", 0) or 0)
         source.source_channel_title = entity_title(entity)
-        limit = get_int(scan.owner_id, "JOIN_SCAN_MESSAGE_LIMIT", current_app.config["JOIN_SCAN_MESSAGE_LIMIT"])
+        # A full rescan starts at message id 0 and deliberately reads the whole
+        # source channel; incremental scans keep the configured safety limit.
+        is_full_scan = not (source.last_scanned_message_id or 0)
+        configured_limit = get_int(scan.owner_id, "JOIN_SCAN_MESSAGE_LIMIT", current_app.config["JOIN_SCAN_MESSAGE_LIMIT"])
+        limit = None if is_full_scan else max(1, configured_limit)
         async for message in client.iter_messages(entity, limit=limit, min_id=source.last_scanned_message_id or 0, reverse=True):
             scan.messages_scanned += 1
             max_message_id = max(max_message_id, int(message.id))
@@ -1266,10 +1270,21 @@ async def _scan_join_source(scan_job_id):
                     db.session.add(row)
                     db.session.flush()
                     unique += 1
-                # Do not call Telegram once per discovered URL here.  This local
-                # preparation also repairs old check_failed rows during a rescan.
-                _prepare_join_link_for_execution(row)
-                db.session.commit()
+                # Fully classify each extracted link.  This is paced and retries
+                # FloodWait, so a source with many links remains complete rather
+                # than leaving its links as unknown or failed checks.
+                while True:
+                    try:
+                        await _inspect_join_link(client, row)
+                        db.session.commit()
+                        break
+                    except FloodWaitError as exc:
+                        scan.error_text = f"Telegram rate limit; continuing after {exc.seconds}s"
+                        db.session.commit()
+                        await asyncio.sleep(max(1, int(exc.seconds)))
+                low = max(0.0, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
+                high = max(low, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
+                await asyncio.sleep(random.uniform(low, high))
         source.last_scanned_message_id = max_message_id
         scan.links_found = found
         scan.unique_links = unique
@@ -1301,7 +1316,7 @@ async def _inspect_join_link(client, row):
             chat = getattr(result, "chat", None)
             row.entity_title = getattr(chat, "title", None) or getattr(result, "title", None) or "دعوة تيليجرام"
             row.entity_id = int(getattr(chat, "id", 0) or 0) or None
-            row.entity_type = "channel" if getattr(chat, "broadcast", False) else "group"
+            row.entity_type = "channel" if (getattr(chat, "broadcast", False) or getattr(result, "broadcast", False)) else "group"
             if result.__class__.__name__ == "ChatInviteAlready":
                 row.status = "already_member"
                 row.is_already_member = True
