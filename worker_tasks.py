@@ -730,7 +730,9 @@ async def _execute_search_job(job_id):
                         continue
                     sim = similarity_score(job.query_text, title, username)
                     score = saudi_score(title, username)
-                    matches_title = sim >= 42 and not (job.saudi_only and score < threshold)
+                    # Saudi score is a ranking signal, not an exclusion rule.
+                    # The old condition made normal global queries return zero.
+                    matches_title = sim >= 42
                     if matches_title:
                         _upsert_search_entity(job, dialog.entity, kind, title, username, True, sim, score)
 
@@ -768,8 +770,6 @@ async def _execute_search_job(job_id):
                                 continue
                             sim = max(similarity_score(term, title, username), similarity_score(job.query_text, title, username))
                             score = saudi_score(title, username)
-                            if job.saudi_only and score < threshold:
-                                continue
                             is_member = entity_id in member_ids or any(abs(x) == entity_id for x in member_ids)
                             _upsert_search_entity(job, entity, kind, title, username, is_member, sim, score)
                 except Exception as exc:
@@ -817,8 +817,6 @@ async def _record_search_message(job, account, message, title_hint=None, usernam
     if _is_system_source(username=username, entity_id=getattr(chat, "id", None) if chat else getattr(message, "chat_id", None), usernames=system_usernames, ids=system_ids):
         return None
     score = saudi_score(title, username, text)
-    if job.saudi_only and score < threshold:
-        return None
     peer_id = int(getattr(message, "chat_id", 0) or 0)
     row = SearchMessage.query.filter_by(
         search_job_id=job.id, peer_id=peer_id, message_id=int(message.id)
