@@ -31,6 +31,10 @@
 <div class="alert alert-info">المهمة تراقب حد Telegram ديناميكياً، وستستأنف بعد: <strong>{{ job.rate_limited_until.strftime('%Y-%m-%d %H:%M') }}</strong> إذا كان <code>scheduler_worker.py</code> يعمل.</div>
 {% endif %}
 
+<div id="joinLiveStatus" class="alert alert-info d-flex justify-content-between align-items-center gap-3" data-status-url="{{ url_for('join_manager.job_status', job_id=job.id) }}" aria-live="polite">
+  <span>يتم الاتصال بمتابعة الانضمام…</span><strong id="joinLiveProgress">{{ job.joined_count + job.request_pending_count + job.already_member_count + job.failed_count }} / {{ job.total_links }}</strong>
+</div>
+
 <div class="panel-card">
   <div class="panel-heading">
     <h2 class="h5 mb-0">سجل الروابط</h2>
@@ -72,4 +76,30 @@
     </table>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const panel = document.getElementById('joinLiveStatus');
+  if (!panel) return;
+  const message = panel.querySelector('span');
+  const progress = document.getElementById('joinLiveProgress');
+  let timer;
+  async function refresh() {
+    try {
+      const response = await fetch(panel.dataset.statusUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+      if (!response.ok) throw new Error('status');
+      const data = await response.json();
+      message.textContent = data.message;
+      progress.textContent = `${data.processed} / ${data.total}`;
+      panel.className = `alert d-flex justify-content-between align-items-center gap-3 ${data.status === 'paused_rate_limit' ? 'alert-warning' : data.terminal ? 'alert-secondary' : 'alert-info'}`;
+      if (data.terminal) { window.clearInterval(timer); return; }
+    } catch (_) {
+      message.textContent = 'تعذر تحديث الحالة الآن، وستتم إعادة المحاولة تلقائياً.';
+    }
+  }
+  refresh();
+  timer = window.setInterval(refresh, 4000);
+})();
+</script>
 {% endblock %}

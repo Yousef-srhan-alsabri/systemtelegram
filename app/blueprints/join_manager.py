@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.background import submit_job
@@ -312,6 +312,31 @@ def job_detail(job_id):
         .all()
     )
     return render_template("join_manager/job_detail.html", job=job, items=items)
+
+
+@bp.get("/jobs/<int:job_id>/status")
+@login_required
+def job_status(job_id):
+    """Small polling endpoint so the join screen never looks frozen while a worker runs."""
+    job = JoinJob.query.filter_by(id=job_id, owner_id=current_user.id).first_or_404()
+    processed = job.joined_count + job.request_pending_count + job.already_member_count + job.failed_count
+    state = {
+        "queued": "بانتظار عامل التنفيذ.",
+        "running": "الانضمام مستمر ويتم تحديث النتائج تلقائياً.",
+        "paused_rate_limit": "أوقف Telegram الطلبات مؤقتاً؛ ستُستأنف المهمة تلقائياً عند انتهاء المهلة.",
+        "paused": "المهمة متوقفة مؤقتاً من لوحة التحكم.",
+        "stopped": "المهمة متوقفة وتحتاج إلى استئناف يدوي.",
+        "completed": "اكتملت عملية الانضمام.",
+        "cancelled": "أُلغيت عملية الانضمام.",
+    }.get(job.status, job.stopped_reason or "تتم متابعة حالة المهمة.")
+    return jsonify({
+        "id": job.id, "status": job.status, "message": job.stopped_reason or state,
+        "processed": processed, "total": job.total_links, "joined": job.joined_count,
+        "pending": job.request_pending_count, "already_member": job.already_member_count,
+        "failed": job.failed_count,
+        "rate_limited_until": job.rate_limited_until.isoformat() if job.rate_limited_until else None,
+        "terminal": job.status in {"completed", "cancelled", "stopped", "failed"},
+    })
 
 
 @bp.post("/jobs/<int:job_id>/pause")

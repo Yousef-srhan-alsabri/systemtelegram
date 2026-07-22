@@ -260,7 +260,9 @@ function selectJoinLinks(mode) {
   const boxes = Array.from(document.querySelectorAll('.join-link-check'));
   const toggleAll = document.getElementById('toggleAllJoinLinks');
   const joinMode = document.getElementById('joinMode');
-  const batchSize = 80;
+  // Yield frequently: selecting a large discovery list must never freeze clicks
+  // or the browser's rendering thread.
+  const batchSize = 30;
   let index = 0;
   if (joinMode) joinMode.value = 'selected';
   setJoinSelectionBusy(true);
@@ -272,7 +274,8 @@ function selectJoinLinks(mode) {
       boxes[index].checked = linkMatchesMode(boxes[index], mode);
     }
     if (index < boxes.length) {
-      window.requestAnimationFrame(applyBatch);
+      if (window.requestIdleCallback) window.requestIdleCallback(applyBatch, { timeout: 80 });
+      else window.setTimeout(applyBatch, 0);
       return;
     }
     if (toggleAll) {
@@ -282,7 +285,8 @@ function selectJoinLinks(mode) {
     updateSelectedLinksCount();
     setJoinSelectionBusy(false);
   }
-  window.requestAnimationFrame(applyBatch);
+  if (window.requestIdleCallback) window.requestIdleCallback(applyBatch, { timeout: 80 });
+  else window.setTimeout(applyBatch, 0);
 }
 
 function selectJoinAccounts(mode) {

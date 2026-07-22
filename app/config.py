@@ -60,6 +60,8 @@ class Config:
     SEARCH_SCOPE_DEFAULT = os.getenv("SEARCH_SCOPE_DEFAULT", "global_plus_joined").strip()
     SEARCH_INCLUDE_PUBLIC_MESSAGES = os.getenv("SEARCH_INCLUDE_PUBLIC_MESSAGES", "true").lower() in {"1", "true", "yes", "on"}
     SEARCH_GLOBAL_LIMIT = int(os.getenv("SEARCH_GLOBAL_LIMIT", "100"))
+    # Avoid loading an unbounded Telegram dialog history before a search starts.
+    SEARCH_JOINED_DIALOG_LIMIT = int(os.getenv("SEARCH_JOINED_DIALOG_LIMIT", "500"))
     JOIN_MAX_ITEMS_PER_JOB = int(os.getenv("JOIN_MAX_ITEMS_PER_JOB", "10"))
     JOIN_DELAY_MIN_SECONDS = int(os.getenv("JOIN_DELAY_MIN_SECONDS", "15"))
     JOIN_DELAY_MAX_SECONDS = int(os.getenv("JOIN_DELAY_MAX_SECONDS", "30"))

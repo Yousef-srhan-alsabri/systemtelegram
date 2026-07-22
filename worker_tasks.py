@@ -682,7 +682,11 @@ async def _execute_search_job(job_id):
             member_ids = set()
             if include_joined or include_global:
                 try:
-                    dialogs = await client.get_dialogs(limit=None)
+                    dialog_limit = max(50, min(
+                        get_int(job.owner_id, "SEARCH_JOINED_DIALOG_LIMIT", current_app.config.get("SEARCH_JOINED_DIALOG_LIMIT", 500)),
+                        2000,
+                    ))
+                    dialogs = await client.get_dialogs(limit=dialog_limit)
                     member_ids = {int(dialog.id) for dialog in dialogs}
                 except Exception as exc:
                     errors.append(f"قراءة محادثات الحساب {account.id}: {type(exc).__name__}")
@@ -700,10 +704,17 @@ async def _execute_search_job(job_id):
                         continue
                     sim = similarity_score(job.query_text, title, username)
                     score = saudi_score(title, username)
-                    if sim >= 42 and not (job.saudi_only and score < threshold):
+                    matches_title = sim >= 42 and not (job.saudi_only and score < threshold)
+                    if matches_title:
                         _upsert_search_entity(job, dialog.entity, kind, title, username, True, sim, score)
 
-                    # Search inside joined chats too; this covers messages that global search may not return.
+                    # Per-chat history search is expensive.  Limit it to likely
+                    # matching chats; global message search below still catches
+                    # content-only matches without making the UI appear stuck.
+                    if not matches_title:
+                        continue
+                    # Search inside likely matching joined chats too; this covers
+                    # messages that global search may not return.
                     for term in query_terms:
                         try:
                             async for message in client.iter_messages(dialog.entity, search=term, limit=per_dialog_limit):
@@ -947,7 +958,12 @@ def _pdf_escape(value):
 def _is_whatsapp_group_link(link):
     try:
         from urllib.parse import urlsplit
-        return (urlsplit(link.url).hostname or "").lower() in {"chat.whatsapp.com", "www.chat.whatsapp.com"}
+        parsed = urlsplit(link.url)
+        host = (parsed.hostname or "").lower()
+        # A valid invite has an opaque token.  Checking it avoids exporting generic
+        # WhatsApp pages that happen to contain the domain name.
+        token = parsed.path.strip("/").split("/", 1)[0]
+        return host in {"chat.whatsapp.com", "www.chat.whatsapp.com"} and bool(re.fullmatch(r"[A-Za-z0-9_-]{10,64}", token))
     except Exception:
         return False
 
@@ -1590,10 +1606,11 @@ async def _execute_join_job(join_job_id):
                     break
 
             if index < len(items) - 1:
-                await asyncio.sleep(random.uniform(
-                    get_int(job.owner_id, "JOIN_DELAY_MIN_SECONDS", current_app.config["JOIN_DELAY_MIN_SECONDS"]),
-                    get_int(job.owner_id, "JOIN_DELAY_MAX_SECONDS", current_app.config["JOIN_DELAY_MAX_SECONDS"]),
-                ))
+                # Preserve Telegram-safe pacing, while tolerating inverted values
+                # saved in Settings instead of crashing a whole job.
+                low = max(0, get_int(job.owner_id, "JOIN_DELAY_MIN_SECONDS", current_app.config["JOIN_DELAY_MIN_SECONDS"]))
+                high = max(low, get_int(job.owner_id, "JOIN_DELAY_MAX_SECONDS", current_app.config["JOIN_DELAY_MAX_SECONDS"]))
+                await asyncio.sleep(random.uniform(low, high))
 
         job.status = "completed"
         job.completed_at = utcnow()

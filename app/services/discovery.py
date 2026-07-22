@@ -117,6 +117,11 @@ def parse_telegram_link(url: str) -> TelegramLinkTarget:
     host = (parsed.hostname or "").lower()
     if host not in TELEGRAM_HOSTS:
         return TelegramLinkTarget("unsupported", None)
+    # Telegram also emits tg://join?invite=... from mobile share sheets.
+    if parsed.scheme.lower() == "tg" and parsed.netloc.lower() == "join":
+        from urllib.parse import parse_qs
+        invite = parse_qs(parsed.query).get("invite", [None])[0]
+        return TelegramLinkTarget("invite", invite) if invite else TelegramLinkTarget("unsupported", None)
     path = parsed.path.strip("/")
     if not path:
         return TelegramLinkTarget("unsupported", None)
