@@ -315,6 +315,7 @@ def execute():
         return redirect(url_for("join_manager.index"))
 
     auto_continue = get_bool(current_user.id, "JOIN_CONTINUE_BATCHES", current_app.config.get("JOIN_CONTINUE_BATCHES", False))
+    resume_after_floodwait = get_bool(current_user.id, "JOIN_RESUME_AFTER_FLOODWAIT", current_app.config.get("JOIN_RESUME_AFTER_FLOODWAIT", True))
     batch_pause_seconds = get_int(current_user.id, "JOIN_BATCH_PAUSE_SECONDS", current_app.config.get("JOIN_BATCH_PAUSE_SECONDS", 300))
     max_batches = get_int(current_user.id, "JOIN_MAX_BATCHES_PER_RUN", current_app.config.get("JOIN_MAX_BATCHES_PER_RUN", 5))
     if join_mode == "selected":
@@ -344,6 +345,7 @@ def execute():
             total_links=len(account_rows),
             selection_mode=join_mode,
             auto_continue=auto_continue,
+            auto_resume=resume_after_floodwait,
             batch_pause_seconds=batch_pause_seconds,
             max_batches=max(1, max_batches),
             batch_index=1,
