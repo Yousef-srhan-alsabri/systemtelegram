@@ -23,7 +23,7 @@ from telethon.errors import (
 from telethon.sessions import StringSession
 
 from app.extensions import db
-from app.background import get_account_lock, set_qr_state
+from app.background import get_account_lock, set_qr_state, submit_job
 from app.models import ContentItem, MessageLog, MessageTask, TelegramAccount, TelegramGroup, ChannelPost, ChannelSettings, utcnow
 from app.services.crypto import CryptoService
 from app.services.telegram import build_client
@@ -1235,6 +1235,7 @@ async def _scan_join_source(scan_job_id):
     max_message_id = source.last_scanned_message_id or 0
     found = 0
     unique = 0
+    pending_link_ids = []
     try:
         await client.connect()
         entity = await client.get_entity(source.source_channel_ref)
@@ -1270,21 +1271,11 @@ async def _scan_join_source(scan_job_id):
                     db.session.add(row)
                     db.session.flush()
                     unique += 1
-                # Fully classify each extracted link.  This is paced and retries
-                # FloodWait, so a source with many links remains complete rather
-                # than leaving its links as unknown or failed checks.
-                while True:
-                    try:
-                        await _inspect_join_link(client, row)
-                        db.session.commit()
-                        break
-                    except FloodWaitError as exc:
-                        scan.error_text = f"Telegram rate limit; continuing after {exc.seconds}s"
-                        db.session.commit()
-                        await asyncio.sleep(max(1, int(exc.seconds)))
-                low = max(0.0, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
-                high = max(low, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
-                await asyncio.sleep(random.uniform(low, high))
+                # Phase 1: discover every link immediately without API calls.
+                # Phase 2 below classifies it safely in a background worker.
+                _prepare_join_link_for_execution(row)
+                pending_link_ids.append(row.id)
+                db.session.commit()
         source.last_scanned_message_id = max_message_id
         scan.links_found = found
         scan.unique_links = unique
@@ -1292,6 +1283,8 @@ async def _scan_join_source(scan_job_id):
         scan.error_text = None
         scan.completed_at = utcnow()
         db.session.commit()
+        if pending_link_ids:
+            submit_job(current_app._get_current_object(), inspect_join_links, account.id, pending_link_ids)
         return {"status": "completed", "unique": unique}
     except Exception as exc:
         scan.status = "failed"
