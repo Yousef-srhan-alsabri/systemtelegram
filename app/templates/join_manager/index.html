@@ -23,6 +23,7 @@
     <a class="btn btn-outline-success" href="{{ url_for('join_manager.export_links_csv', link_kind='whatsapp') }}"><i class="bi bi-whatsapp"></i> تصدير WhatsApp</a>
   </div>
 </div>
+<form method="post" action="{{ url_for('join_manager.reprepare_failed_links') }}" class="mb-3"><button class="btn btn-sm btn-outline-warning"><i class="bi bi-arrow-repeat"></i> إعادة تجهيز روابط فشل الفحص القديمة</button></form>
 
 <ul class="nav nav-pills app-tabs mb-3" role="tablist">
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#joinSourcesTab" type="button">المصادر</button></li>
@@ -84,11 +85,11 @@
       <div class="join-command-panel">
         <div>
           <label class="form-label">حسابات التنفيذ</label>
-          <select class="form-select" name="account_ids" id="joinAccountIds" multiple size="5" required>
+          <div class="account-selector join-account-grid" id="joinAccountIds">
             {% for a in accounts %}
-              <option value="{{ a.id }}">{{ a.display_name or a.phone_masked or a.id }}</option>
-            {% endfor %}
-          </select>
+              <label class="account-option"><input class="form-check-input join-account-checkbox" type="checkbox" name="account_ids" value="{{ a.id }}"><span><strong>{{ a.display_name or ('حساب ' ~ a.id) }}</strong><small>{{ a.phone_masked or 'نشط' }}</small></span><i class="bi bi-person-check ms-auto text-primary"></i></label>
+            {% else %}<div class="empty-state">لا توجد حسابات نشطة.</div>{% endfor %}
+          </div>
           <div class="action-row mt-2">
             <button type="button" id="selectAllAccountsBtn" class="btn btn-sm btn-outline-primary">تحديد الحسابات</button>
             <button type="button" id="clearAccountsBtn" class="btn btn-sm btn-outline-secondary">إلغاء الحسابات</button>
@@ -169,7 +170,7 @@
                 <td>
                   {% if l.entity_type == 'group' %}<span class="badge text-bg-primary">قروب</span>
                   {% elif l.entity_type == 'channel' %}<span class="badge text-bg-info">قناة</span>
-                  {% else %}<span class="badge text-bg-secondary">{{ l.entity_type or 'غير محدد' }}</span>{% endif %}
+                  {% else %}<span class="badge text-bg-secondary">بانتظار التحقق عند الانضمام</span>{% endif %}
                   {% if l.invite_hash %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
                 </td>
                 <td>
@@ -258,8 +259,7 @@ function linkMatchesMode(box, mode) {
 }
 
 function selectedJoinAccountsCount() {
-  const select = document.getElementById('joinAccountIds');
-  return select ? Array.from(select.options).filter(option => option.selected).length : 0;
+  return document.querySelectorAll('.join-account-checkbox:checked').length;
 }
 
 function updateSelectedLinksCount() {
@@ -314,9 +314,7 @@ function selectJoinLinks(mode) {
 }
 
 function selectJoinAccounts(mode) {
-  const select = document.getElementById('joinAccountIds');
-  if (!select) return;
-  Array.from(select.options).forEach(option => { option.selected = mode === 'all'; });
+  document.querySelectorAll('.join-account-checkbox').forEach(box => { box.checked = mode === 'all'; });
 }
 
 function confirmJoinMode() {

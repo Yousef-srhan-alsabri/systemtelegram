@@ -177,6 +177,24 @@ def export_links_csv(link_kind):
     return Response(stream.getvalue().encode("utf-8-sig"), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+@bp.post("/links/reprepare")
+@login_required
+def reprepare_failed_links():
+    rows = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id, status="check_failed").all()
+    repaired = 0
+    for row in rows:
+        target = parse_telegram_link(row.url)
+        if target.kind == "invite":
+            row.invite_hash, row.status, row.error_text = target.value, "valid_invite", None
+            repaired += 1
+        elif target.kind == "username":
+            row.username, row.status, row.error_text = target.value, "valid_public", None
+            repaired += 1
+    db.session.commit()
+    flash(f"تمت إعادة تجهيز {repaired} رابطاً. سيُتحقق منها بأمان عند الانضمام.", "success")
+    return redirect(url_for("join_manager.index"))
+
+
 @bp.post("/sources")
 @login_required
 def save_source():
