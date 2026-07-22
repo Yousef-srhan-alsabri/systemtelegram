@@ -285,7 +285,7 @@ function setJoinSelectionBusy(busy) {
   });
 }
 
-function selectJoinLinks(mode) {
+function selectJoinLinks(mode, keepExecutionMode = false) {
   const runId = ++joinSelectionRun;
   const boxes = Array.from(document.querySelectorAll('.join-link-check'));
   const toggleAll = document.getElementById('toggleAllJoinLinks');
@@ -294,7 +294,7 @@ function selectJoinLinks(mode) {
   // or the browser's rendering thread.
   const batchSize = 30;
   let index = 0;
-  if (joinMode) joinMode.value = 'selected';
+  if (joinMode && !keepExecutionMode) joinMode.value = 'selected';
   setJoinSelectionBusy(true);
 
   function applyBatch() {
@@ -349,6 +349,17 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('selectInvitesBtn')?.addEventListener('click', () => selectJoinLinks('invites'));
   document.getElementById('selectApprovalBtn')?.addEventListener('click', () => selectJoinLinks('approval'));
   document.getElementById('clearLinksBtn')?.addEventListener('click', () => selectJoinLinks('none'));
+  document.getElementById('joinMode')?.addEventListener('change', event => {
+    const map = {
+      all_valid: 'all',
+      groups: 'groups',
+      channels: 'channels',
+      invites: 'invites',
+      approval_required: 'approval'
+    };
+    // "selected" is deliberately left untouched so manual selections remain.
+    if (map[event.target.value]) selectJoinLinks(map[event.target.value], true);
+  });
   document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', updateSelectedLinksCount));
   document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
     if (!confirmJoinMode()) event.preventDefault();
