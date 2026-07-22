@@ -1093,7 +1093,7 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
 
     errors = []
     limit = max(50, min(get_int(job.owner_id, "WHATSAPP_SCAN_MESSAGE_LIMIT", current_app.config.get("WHATSAPP_SCAN_MESSAGE_LIMIT", 2000)), 10000))
-    allowed_kinds = {"group", "channel"} if job.scope == "groups_channels" else {job.scope[:-1] if job.scope.endswith("s") else job.scope}
+    allowed_kinds = None if job.scope == "all_conversations" else ({"group", "channel"} if job.scope == "groups_channels" else {job.scope[:-1] if job.scope.endswith("s") else job.scope})
 
     for account in accounts:
         client = _account_client(account)
@@ -1110,7 +1110,7 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
             dialogs = await client.get_dialogs(limit=None)
             for dialog in dialogs:
                 kind = entity_kind(dialog.entity)
-                if kind not in allowed_kinds:
+                if allowed_kinds is not None and kind not in allowed_kinds:
                     continue
                 username = getattr(dialog.entity, "username", None)
                 entity_id = getattr(dialog.entity, "id", None)
@@ -1142,7 +1142,7 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
                                 url_hash=link.url_hash,
                                 source_title=title,
                                 source_username=username,
-                                source_type=kind,
+                                source_type=kind or "private",
                                 source_message_id=int(message.id),
                                 source_message_url=source_url,
                                 message_date=message_date,

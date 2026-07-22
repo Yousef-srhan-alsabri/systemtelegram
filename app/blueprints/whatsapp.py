@@ -33,7 +33,7 @@ def index():
         account_ids = [int(v) for v in request.form.getlist("account_ids") if str(v).isdigit()]
         selected_accounts = [a for a in accounts if a.id in account_ids]
         scope = request.form.get("scope", "groups_channels")
-        if scope not in {"groups", "channels", "groups_channels"}:
+        if scope not in {"groups", "channels", "groups_channels", "all_conversations"}:
             scope = "groups_channels"
         export_mode = request.form.get("export_mode", "pdf")
         if export_mode not in {"pdf", "channel", "both"}:
