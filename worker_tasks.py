@@ -527,7 +527,10 @@ def _extract_message_links(message):
         offset = getattr(entity, "offset", None)
         length = getattr(entity, "length", None)
         if offset is not None and length:
-            candidates.append(text[offset:offset + length])
+            # Telegram offsets use UTF-16 code units.  Normal Python slicing
+            # misses hidden URLs after Arabic text or emoji unless converted.
+            encoded = text.encode("utf-16-le")
+            candidates.append(encoded[offset * 2:(offset + length) * 2].decode("utf-16-le", "ignore"))
 
     # Links inside inline keyboard buttons.
     reply_markup = getattr(message, "reply_markup", None)
@@ -540,6 +543,26 @@ def _extract_message_links(message):
 
     merged = "\n".join(candidates)
     return extract_links(merged)
+
+
+def _prepare_join_link_for_execution(row):
+    """Classify a Telegram URL locally without consuming Telegram API quota.
+
+    Source channels often contain hundreds of links in one post.  Checking every
+    one via the API triggers FloodWait and incorrectly made valid links look bad.
+    The worker still performs the authoritative check just before joining.
+    """
+    target = parse_telegram_link(row.url)
+    row.error_text = None
+    row.checked_at = utcnow()
+    if target.kind == "invite":
+        row.invite_hash = target.value
+        row.status = "valid_invite"
+    elif target.kind == "username":
+        row.username = target.value
+        row.status = "valid_public"
+    else:
+        row.status = "unsupported"
 
 def _account_client(account):
     session = _crypto().decrypt(account.encrypted_session)
@@ -1245,21 +1268,10 @@ async def _scan_join_source(scan_job_id):
                     db.session.add(row)
                     db.session.flush()
                     unique += 1
-                # Telegram throttles invite checks aggressively.  Keep a small,
-                # configurable gap and retry rate limits instead of marking links
-                # as failed merely because the account must wait.
-                while True:
-                    try:
-                        await _inspect_join_link(client, row)
-                        db.session.commit()
-                        break
-                    except FloodWaitError as exc:
-                        scan.error_text = f"Telegram rate limit; continuing after {exc.seconds}s"
-                        db.session.commit()
-                        await asyncio.sleep(max(1, int(exc.seconds)))
-                low = max(0.0, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
-                high = max(low, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
-                await asyncio.sleep(random.uniform(low, high))
+                # Do not call Telegram once per discovered URL here.  This local
+                # preparation also repairs old check_failed rows during a rescan.
+                _prepare_join_link_for_execution(row)
+                db.session.commit()
         source.last_scanned_message_id = max_message_id
         scan.links_found = found
         scan.unique_links = unique

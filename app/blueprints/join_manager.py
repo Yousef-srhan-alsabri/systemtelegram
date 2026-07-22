@@ -16,7 +16,7 @@ from app.models import (
 from app.services.audit import log_action
 from app.services.discovery import parse_telegram_link
 from app.services.settings import get_bool, get_int
-from worker_tasks import execute_join_job, inspect_join_links, scan_join_source
+from worker_tasks import execute_join_job, scan_join_source
 
 bp = Blueprint("join_manager", __name__, url_prefix="/join-manager")
 
@@ -204,6 +204,7 @@ def import_search(job_id):
         if parse_telegram_link(link.url).kind == "unsupported":
             continue
         row = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id, account_id=account.id, url_hash=link.url_hash).first()
+        target = parse_telegram_link(link.url)
         if not row:
             db.session.add(DiscoveredJoinLink(
                 owner_id=current_user.id,
@@ -211,15 +212,14 @@ def import_search(job_id):
                 url=link.url,
                 url_hash=link.url_hash,
                 source_message_url=link.source_message_url,
-                status="discovered",
+                invite_hash=target.value if target.kind == "invite" else None,
+                username=target.value if target.kind == "username" else None,
+                status="valid_invite" if target.kind == "invite" else "valid_public",
             ))
             added += 1
     log_action("join_links.added_from_search", "search_job", job.id, details=f"added={added}")
     db.session.commit()
-    new_rows = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id, account_id=account.id, status="discovered").all()
-    if new_rows:
-        submit_job(current_app._get_current_object(), inspect_join_links, account.id, [row.id for row in new_rows])
-    flash(f"تمت إضافة {added} رابطاً إلى مدير الانضمام وبدأ فحصها.", "success")
+    flash(f"تمت إضافة {added} رابطاً إلى مدير الانضمام وتجهيزها للانضمام.", "success")
     return redirect(url_for("join_manager.index"))
 
 

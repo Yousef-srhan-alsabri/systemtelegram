@@ -6,7 +6,7 @@ from urllib.parse import urlsplit, urlunsplit
 # Keep this deliberately host-oriented.  Invite links are frequently pasted without
 # a scheme, wrapped in punctuation, or attached to text inside a Telegram button.
 URL_PATTERN = re.compile(
-    r'(?i)(?<![\w@])((?:https?://)?(?:www\.)?(?:t\.me|telegram\.me|chat\.whatsapp\.com|whatsapp\.com|wa\.me)(?:/[^\s<>"\'\]\[{}()]*)?)'
+    r'(?i)(?<![\w@])((?:https?://)?(?:www\.)?(?:t\.me|telegram\.me|chat\.whatsapp\.com|whatsapp\.com|wa\.me)(?:/[^\s<>"\'\]\[{}()،,;]*)?)'
 )
 TG_INVITE_PATTERN = re.compile(r"(?i)tg://join\?[^\s<>\"'\]\[{}()]+")
 MENTION_PATTERN = re.compile(r'(?<![A-Za-z0-9_])@([A-Za-z0-9_]{5,32})')
