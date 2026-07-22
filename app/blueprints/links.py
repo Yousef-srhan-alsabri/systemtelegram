@@ -1,4 +1,5 @@
-from flask import Blueprint, flash, render_template, request
+import os
+from flask import Blueprint, current_app, flash, render_template, request, send_file
 from flask_login import current_user, login_required
 
 from app.extensions import db
@@ -24,3 +25,15 @@ def index():
     links = ManagedLink.query.filter_by(owner_id=current_user.id).order_by(ManagedLink.id.desc()).all()
     grouped = {kind: [x for x in links if x.link_type == kind] for kind in ("telegram", "whatsapp", "other")}
     return render_template("links.html", grouped=grouped)
+
+
+@bp.get("/export/<string:kind>/pdf")
+@login_required
+def export_pdf(kind):
+    if kind not in {"telegram", "whatsapp"}:
+        return "Unknown link type", 404
+    rows = ManagedLink.query.filter_by(owner_id=current_user.id, link_type=kind).order_by(ManagedLink.id.desc()).all()
+    from worker_tasks import _write_simple_links_pdf
+    path = os.path.join(current_app.instance_path, "exports", f"managed-{kind}-{current_user.id}.pdf")
+    _write_simple_links_pdf(path, f"{kind.title()} links", [row.url for row in rows] or ["No links found."])
+    return send_file(path, as_attachment=True, download_name=f"{kind}-links.pdf")
