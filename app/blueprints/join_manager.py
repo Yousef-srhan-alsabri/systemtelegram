@@ -297,7 +297,9 @@ def execute():
         flash(f"بدأت مهمة الانضمام: {len(source_rows)} رابط. الحساب: {created_jobs[0].account_id}.", "success")
     else:
         flash(f"بدأت {len(created_jobs)} مهام انضمام على {len(created_jobs)} حسابات. كل حساب سيعالج حتى {len(source_rows)} رابط في الدفعة الأولى.", "success")
-    return redirect(url_for("join_manager.index"))
+    # Open the live status screen immediately, rather than leaving the user on
+    # the list page where a background join can look like it never started.
+    return redirect(url_for("join_manager.job_detail", job_id=created_jobs[0].id))
 
 
 @bp.get("/jobs/<int:job_id>")

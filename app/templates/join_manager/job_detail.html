@@ -35,6 +35,12 @@
   <span>يتم الاتصال بمتابعة الانضمام…</span><strong id="joinLiveProgress">{{ job.joined_count + job.request_pending_count + job.already_member_count + job.failed_count }} / {{ job.total_links }}</strong>
 </div>
 
+<div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080" aria-live="polite" aria-atomic="true">
+  <div id="joinStatusToast" class="toast border-0 text-bg-primary" role="status" data-bs-delay="6500">
+    <div class="d-flex"><div class="toast-body"><strong id="joinToastTitle">متابعة الانضمام</strong><div id="joinToastMessage" class="small mt-1"></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="إغلاق"></button></div>
+  </div>
+</div>
+
 <div class="panel-card">
   <div class="panel-heading">
     <h2 class="h5 mb-0">سجل الروابط</h2>
@@ -84,7 +90,20 @@
   if (!panel) return;
   const message = panel.querySelector('span');
   const progress = document.getElementById('joinLiveProgress');
+  const toastEl = document.getElementById('joinStatusToast');
+  const toastTitle = document.getElementById('joinToastTitle');
+  const toastMessage = document.getElementById('joinToastMessage');
+  const toast = toastEl && window.bootstrap ? bootstrap.Toast.getOrCreateInstance(toastEl) : null;
+  let lastStatus = null;
   let timer;
+  function notify(data) {
+    if (!toast || lastStatus === data.status) return;
+    lastStatus = data.status;
+    toastTitle.textContent = data.status === 'paused_rate_limit' ? 'تم الإيقاف مؤقتاً بواسطة Telegram' : data.terminal ? 'تحديث مهمة الانضمام' : 'الانضمام مستمر';
+    toastMessage.textContent = `${data.message} (${data.processed}/${data.total})`;
+    toastEl.className = `toast border-0 ${data.status === 'paused_rate_limit' ? 'text-bg-warning' : data.terminal ? 'text-bg-secondary' : 'text-bg-primary'}`;
+    toast.show();
+  }
   async function refresh() {
     try {
       const response = await fetch(panel.dataset.statusUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
@@ -93,6 +112,7 @@
       message.textContent = data.message;
       progress.textContent = `${data.processed} / ${data.total}`;
       panel.className = `alert d-flex justify-content-between align-items-center gap-3 ${data.status === 'paused_rate_limit' ? 'alert-warning' : data.terminal ? 'alert-secondary' : 'alert-info'}`;
+      notify(data);
       if (data.terminal) { window.clearInterval(timer); return; }
     } catch (_) {
       message.textContent = 'تعذر تحديث الحالة الآن، وستتم إعادة المحاولة تلقائياً.';
