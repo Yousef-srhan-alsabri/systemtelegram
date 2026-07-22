@@ -84,10 +84,10 @@
     <form method="post" action="{{ url_for('join_manager.execute') }}" id="joinExecuteForm" class="panel-card overflow-hidden">
       <div class="join-command-panel">
         <div>
-          <label class="form-label">حسابات التنفيذ</label>
+          <div class="d-flex justify-content-between align-items-center mb-2"><label class="form-label mb-0">حسابات التنفيذ</label><span class="count-badge" id="selectedAccountsCount">0 حساب محدد</span></div>
           <div class="account-selector join-account-grid" id="joinAccountIds">
             {% for a in accounts %}
-              <label class="account-option"><input class="form-check-input join-account-checkbox" type="checkbox" name="account_ids" value="{{ a.id }}"><span><strong>{{ a.display_name or ('حساب ' ~ a.id) }}</strong><small>{{ a.phone_masked or 'نشط' }}</small></span><i class="bi bi-person-check ms-auto text-primary"></i></label>
+              <label class="account-option join-execution-account"><input class="form-check-input join-account-checkbox" type="checkbox" name="account_ids" value="{{ a.id }}"><span><strong>{{ a.display_name or ('حساب ' ~ a.id) }}</strong><small>{{ a.phone_masked or 'بدون رقم ظاهر' }}</small><small><span class="status-dot"></span> نشط{% if a.last_seen_at %} · آخر نشاط {{ a.last_seen_at.strftime('%H:%M') }}{% endif %}</small></span><i class="bi bi-person-check ms-auto text-primary"></i></label>
             {% else %}<div class="empty-state">لا توجد حسابات نشطة.</div>{% endfor %}
           </div>
           <div class="action-row mt-2">
@@ -262,6 +262,12 @@ function selectedJoinAccountsCount() {
   return document.querySelectorAll('.join-account-checkbox:checked').length;
 }
 
+function updateSelectedAccountsCount() {
+  const count = selectedJoinAccountsCount();
+  const label = document.getElementById('selectedAccountsCount');
+  if (label) label.textContent = `${count} حساب${count === 1 ? '' : 'ات'} محدد`;
+}
+
 function updateSelectedLinksCount() {
   const count = document.querySelectorAll('.join-link-check:checked').length;
   const label = document.getElementById('selectedLinksCount');
@@ -315,6 +321,7 @@ function selectJoinLinks(mode) {
 
 function selectJoinAccounts(mode) {
   document.querySelectorAll('.join-account-checkbox').forEach(box => { box.checked = mode === 'all'; });
+  updateSelectedAccountsCount();
 }
 
 function confirmJoinMode() {
@@ -335,6 +342,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('toggleAllJoinLinks')?.addEventListener('change', event => selectJoinLinks(event.target.checked ? 'all' : 'none'));
   document.getElementById('selectAllAccountsBtn')?.addEventListener('click', () => selectJoinAccounts('all'));
   document.getElementById('clearAccountsBtn')?.addEventListener('click', () => selectJoinAccounts('none'));
+  document.querySelectorAll('.join-account-checkbox').forEach(box => box.addEventListener('change', updateSelectedAccountsCount));
   document.getElementById('selectAllLinksBtn')?.addEventListener('click', () => selectJoinLinks('all'));
   document.getElementById('selectGroupsBtn')?.addEventListener('click', () => selectJoinLinks('groups'));
   document.getElementById('selectChannelsBtn')?.addEventListener('click', () => selectJoinLinks('channels'));
@@ -356,6 +364,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (distributionHint) distributionHint.textContent = hints[distribution.value];
   });
   updateSelectedLinksCount();
+  updateSelectedAccountsCount();
 });
 </script>
 {% endblock %}
