@@ -210,7 +210,7 @@
               <thead><tr><th>#</th><th>الحالة</th><th>رسائل</th><th>جديد</th><th>الخطأ</th></tr></thead>
               <tbody>
                 {% for s in scans %}
-                  <tr><td>{{ s.id }}</td><td><span class="status-pill status-{{ s.status }}">{{ s.status|ar_status }}</span></td><td>{{ s.messages_scanned }}</td><td>{{ s.unique_links }}</td><td class="small text-danger">{{ s.error_text or "—" }}</td></tr>
+                  <tr class="scan-progress" data-status-url="{{ url_for('join_manager.scan_status', scan_id=s.id) }}"><td>{{ s.id }}</td><td><span class="status-pill status-{{ s.status }} scan-state">{{ s.status|ar_status }}</span><small class="d-block text-muted scan-queue">بانتظار التحديث</small></td><td class="scan-messages">{{ s.messages_scanned }}</td><td class="scan-found">{{ s.unique_links }}</td><td class="small text-danger scan-error">{{ s.error_text or "—" }}</td></tr>
                 {% else %}
                   <tr><td colspan="5" class="empty-state">لا توجد عمليات.</td></tr>
                 {% endfor %}
@@ -395,6 +395,18 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   updateSelectedLinksCount();
   updateSelectedAccountsCount();
+  document.querySelectorAll('.scan-progress').forEach(row => {
+    const refresh = async () => {
+      try {
+        const data = await fetch(row.dataset.statusUrl, {cache:'no-store'}).then(r => r.json());
+        row.querySelector('.scan-messages').textContent = data.messages;
+        row.querySelector('.scan-found').textContent = data.total;
+        row.querySelector('.scan-queue').textContent = `صُنّف ${data.classified} · بانتظار ${data.pending} · فشل ${data.failed}`;
+        row.querySelector('.scan-error').textContent = data.error || '—';
+      } catch (_) {}
+    };
+    refresh(); window.setInterval(refresh, 5000);
+  });
 });
 </script>
 {% endblock %}

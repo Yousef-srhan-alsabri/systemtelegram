@@ -432,6 +432,18 @@ def job_status(job_id):
     })
 
 
+@bp.get("/scans/<int:scan_id>/status")
+@login_required
+def scan_status(scan_id):
+    scan = JoinScanJob.query.filter_by(id=scan_id, owner_id=current_user.id).first_or_404()
+    links_query = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id, scan_job_id=scan.id)
+    total = links_query.count()
+    classified = links_query.filter(DiscoveredJoinLink.entity_type.in_(["group", "channel"])).count()
+    pending = links_query.filter(DiscoveredJoinLink.entity_type.is_(None)).filter(DiscoveredJoinLink.status.in_(["valid_public", "valid_invite", "discovered", "checking"])).count()
+    failed = links_query.filter(DiscoveredJoinLink.status.in_(["check_failed", "invalid", "expired", "private_inaccessible", "unsupported"])).count()
+    return jsonify({"status": scan.status, "messages": scan.messages_scanned, "found": scan.links_found, "total": total, "classified": classified, "pending": pending, "failed": failed, "error": scan.error_text})
+
+
 @bp.post("/jobs/<int:job_id>/pause")
 @login_required
 def job_pause(job_id):
