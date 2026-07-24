@@ -100,5 +100,7 @@
 .import-toolbar{display:grid;grid-template-columns:minmax(240px,360px) auto;gap:.75rem;align-items:center}
 .search-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
 .option-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.form-switch .form-check-input{transition:none!important;touch-action:manipulation;cursor:pointer}
+.setting-switch-state{display:inline-flex;align-items:center;font-size:.75rem;font-weight:800;color:#1d4ed8;background:#eff6ff;border-radius:999px;padding:.18rem .5rem}
 @media(max-width:1199px){.join-command-panel{grid-template-columns:1fr 1fr}.join-command-panel>.d-grid{grid-column:1/-1}.result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.results-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:767px){.join-command-panel,.import-toolbar,.search-settings-grid,.option-grid{grid-template-columns:1fr}.selection-toolbar{position:static;align-items:stretch;flex-direction:column}.selection-summary{justify-content:space-between}.result-grid,.results-summary-grid{grid-template-columns:1fr}.message-head{flex-direction:column}.message-meta{justify-content:flex-start}.message-actions{justify-content:flex-start}.export-toolbar{align-items:flex-start;flex-direction:column}}
