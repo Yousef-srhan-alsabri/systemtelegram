@@ -134,6 +134,10 @@ def index():
     sources = JoinSource.query.filter_by(owner_id=current_user.id).order_by(JoinSource.id.desc()).all()
     links = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id).order_by(DiscoveredJoinLink.id.desc()).limit(1000).all()
     jobs = JoinJob.query.filter_by(owner_id=current_user.id).order_by(JoinJob.id.desc()).limit(20).all()
+    active_join_account_ids = [account_id for (account_id,) in db.session.query(JoinJob.account_id).filter(
+        JoinJob.owner_id == current_user.id,
+        JoinJob.status.in_(["queued", "running", "paused", "stopped", "paused_rate_limit"]),
+    ).all()]
     scans = JoinScanJob.query.filter_by(owner_id=current_user.id).order_by(JoinScanJob.id.desc()).limit(20).all()
     join_stats = {
         "all_valid": DiscoveredJoinLink.query.filter(
@@ -151,6 +155,7 @@ def index():
         sources=sources,
         links=links,
         jobs=jobs,
+        active_join_account_ids=active_join_account_ids,
         scans=scans,
         join_stats=join_stats,
         max_items=get_int(current_user.id, "JOIN_MAX_ITEMS_PER_JOB", current_app.config["JOIN_MAX_ITEMS_PER_JOB"]),
@@ -306,6 +311,14 @@ def execute():
 
     if not accounts:
         flash("اختر حساباً نشطاً واحداً على الأقل", "danger")
+        return redirect(url_for("join_manager.index"))
+
+    busy_account_ids = [account.id for account in accounts if JoinJob.query.filter(
+        JoinJob.owner_id == current_user.id, JoinJob.account_id == account.id,
+        JoinJob.status.in_(["queued", "running", "paused", "stopped", "paused_rate_limit"]),
+    ).first()]
+    if busy_account_ids:
+        flash("لا يمكن بدء حملة مكررة: يوجد انضمام نشط أو متوقف مؤقتاً للحساب/الحسابات المحددة.", "warning")
         return redirect(url_for("join_manager.index"))
 
     pool_size = max_items if distribution_mode == "shared" else max_items * len(accounts)

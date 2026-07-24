@@ -32,6 +32,7 @@
 </ul>
 
 <div class="tab-content">
+  <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index:1080"><div id="duplicateJoinToast" class="toast text-bg-warning border-0" role="alert"><div class="d-flex"><div class="toast-body"><strong>حملة مكررة</strong><div class="small">يوجد انضمام نشط لهذا الحساب. أوقفه أو ألغِه قبل بدء حملة جديدة.</div></div><button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button></div></div></div>
   <div class="tab-pane fade show active" id="joinSourcesTab">
     <div class="row g-4">
       <div class="col-xl-4">
@@ -372,6 +373,13 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', () => updateSelectedLinksCount(false)));
   document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
+    const busy = new Set({{ active_join_account_ids|tojson }});
+    const selectedBusy = Array.from(document.querySelectorAll('.join-account-checkbox:checked')).some(box => busy.has(Number(box.value)));
+    if (selectedBusy) {
+      event.preventDefault();
+      bootstrap.Toast.getOrCreateInstance(document.getElementById('duplicateJoinToast')).show();
+      return;
+    }
     if (!confirmJoinMode()) event.preventDefault();
   });
   const distribution = document.getElementById('distributionMode');
