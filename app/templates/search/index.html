@@ -108,7 +108,7 @@
 document.getElementById('selectAllSearchAccounts')?.addEventListener('click', () => {
   const boxes = [...document.querySelectorAll('.search-account-checkbox')];
   const value = boxes.some(box => !box.checked);
-  boxes.forEach(box => { box.checked = value; });
+  toggleCheckboxesInBatches(boxes, value);
 });
 </script>
 {% endblock %}

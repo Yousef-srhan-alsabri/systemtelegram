@@ -330,8 +330,8 @@ function selectJoinLinks(mode, keepExecutionMode = false) {
 }
 
 function selectJoinAccounts(mode) {
-  document.querySelectorAll('.join-account-checkbox').forEach(box => { box.checked = mode === 'all'; });
-  updateSelectedAccountsCount();
+  const boxes = Array.from(document.querySelectorAll('.join-account-checkbox'));
+  toggleCheckboxesInBatches(boxes, mode === 'all', null, updateSelectedAccountsCount);
 }
 
 function confirmJoinMode() {

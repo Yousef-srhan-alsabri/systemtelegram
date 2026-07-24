@@ -203,7 +203,7 @@
 {% block scripts %}
 <script>
 const selectAllBtn = document.getElementById('selectAllAccounts');
-selectAllBtn?.addEventListener('click', () => { const boxes=[...document.querySelectorAll('.account-checkbox')]; const next=boxes.some(b=>!b.checked); boxes.forEach(b=>{b.checked=next; b.closest('[data-account-card]')?.classList.toggle('is-selected', next);}); });
+selectAllBtn?.addEventListener('click', () => { const boxes=[...document.querySelectorAll('.account-checkbox')]; const next=boxes.some(b=>!b.checked); toggleCheckboxesInBatches(boxes,next,b=>b.closest('[data-account-card]')?.classList.toggle('is-selected',next)); });
 document.querySelectorAll('.account-checkbox').forEach(b=>b.addEventListener('change',()=>b.closest('[data-account-card]')?.classList.toggle('is-selected',b.checked)));
 document.getElementById('contentSelect')?.addEventListener('change', e => { const opt=e.target.selectedOptions[0]; const ta=document.getElementById('campaignText'); if(opt?.dataset.text && !ta.value.trim()) ta.value=opt.dataset.text; });
 function syncSourceMode(){ const mode=document.querySelector('input[name="source_mode"]:checked')?.value||'content'; const isForward=mode==='forward_last'; document.getElementById('forwardSourceBox')?.classList.toggle('d-none',!isForward); document.querySelectorAll('.content-mode-field').forEach(el=>el.classList.toggle('d-none',isForward)); document.querySelectorAll('.forward-mode-field').forEach(el=>el.classList.toggle('d-none',!isForward)); }
