@@ -264,9 +264,13 @@ async def _sync_groups(account_id):
     try:
         await client.connect()
         if not await client.is_user_authorized():
-            account.status = "unauthorized"
-            db.session.commit()
-            return {"status": "unauthorized"}
+            # Do not invalidate a fresh QR session on one transient read.
+            await asyncio.sleep(2)
+            if not await client.is_user_authorized():
+                account.status = "unauthorized"
+                account.status_reason = "Telegram session is no longer authorized; reconnect the account."
+                db.session.commit()
+                return {"status": "unauthorized"}
         dialogs = await client.get_dialogs(limit=None)
         for dialog in dialogs:
             if not dialog.is_group:

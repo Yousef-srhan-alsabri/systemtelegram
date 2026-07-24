@@ -291,7 +291,7 @@ def execute():
     include_imported = request.form.get("include_imported") == "1"
     distribution_mode = request.form.get("distribution_mode", "shared")
     link_order = request.form.get("link_order", "newest")
-    if distribution_mode not in {"shared", "round_robin", "chunks"}:
+    if distribution_mode not in {"shared", "round_robin", "chunks", "random"}:
         distribution_mode = "shared"
     if link_order not in {"newest", "oldest", "random"}:
         link_order = "newest"
@@ -325,10 +325,12 @@ def execute():
         max_batches = 1
 
     assignments = {}
+    if distribution_mode == "random":
+        random.shuffle(source_rows)
     for index, account in enumerate(accounts):
         if distribution_mode == "shared":
             chosen = source_rows[:max_items]
-        elif distribution_mode == "chunks":
+        elif distribution_mode in {"chunks", "random"}:
             chosen = source_rows[index * max_items:(index + 1) * max_items]
         else:
             chosen = source_rows[index::len(accounts)][:max_items]

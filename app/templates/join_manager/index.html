@@ -108,6 +108,7 @@
             <option value="shared">كل الحسابات تنضم لنفس الروابط</option>
             <option value="round_robin">توزيع متوازن بلا تكرار</option>
             <option value="chunks">دفعات متتالية بلا تكرار</option>
+            <option value="random">توزيع عشوائي بلا تكرار</option>
           </select>
           <div class="join-mode-note mt-2" id="distributionHint">كل حساب سيعمل على نفس الروابط المختارة.</div>
         </div>
@@ -380,6 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
       shared: 'كل حساب سيعمل على نفس الروابط المختارة.',
       round_robin: 'تقسيم متوازن: لا يتكرر الرابط بين الحسابات في هذه الحملة.',
       chunks: 'تقسيم متتالٍ: كل حساب يأخذ جزءاً مستقلاً من الروابط حسب الترتيب.'
+      ,random: 'توزيع عشوائي: كل حساب يأخذ روابط مختلفة بدون تكرار داخل الحملة.'
     };
     if (distributionHint) distributionHint.textContent = hints[distribution.value];
   });
