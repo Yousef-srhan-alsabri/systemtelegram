@@ -1467,7 +1467,17 @@ def _used_join_hashes_for_account(owner_id, account_id):
 
 def _create_next_join_batch(previous_job):
     """Create the next JoinJob batch for the same owner/account/mode, if enabled."""
-    if not previous_job.auto_continue:
+    # Read this setting again between batches.  Turning it off in Settings
+    # stops the next batch; turning it on applies to subsequently created jobs.
+    auto_continue = get_bool(
+        previous_job.owner_id,
+        "JOIN_CONTINUE_BATCHES",
+        previous_job.auto_continue,
+    )
+    if previous_job.auto_continue != auto_continue:
+        previous_job.auto_continue = auto_continue
+        db.session.commit()
+    if not auto_continue:
         return None
     if previous_job.batch_index >= max(1, previous_job.max_batches):
         return None
@@ -1475,7 +1485,33 @@ def _create_next_join_batch(previous_job):
     max_items = max(1, get_int(previous_job.owner_id, "JOIN_MAX_ITEMS_PER_JOB", current_app.config["JOIN_MAX_ITEMS_PER_JOB"]))
     mode = previous_job.selection_mode or "all_valid"
     used_hashes = _used_join_hashes_for_account(previous_job.owner_id, previous_job.account_id)
-    source_rows = _global_join_pool_for_mode(previous_job.owner_id, mode, exclude_hashes=used_hashes, limit=max_items)
+    selected_link_ids = []
+    if mode == "selected" and previous_job.continuation_link_ids_json:
+        try:
+            selected_link_ids = [int(link_id) for link_id in json.loads(previous_job.continuation_link_ids_json)]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            selected_link_ids = []
+
+    # Older selected jobs did not save their exact scope.  Do not risk
+    # expanding those legacy jobs into unrelated URLs.
+    if mode == "selected" and not selected_link_ids:
+        return None
+
+    if selected_link_ids:
+        rows_by_id = {
+            row.id: row for row in DiscoveredJoinLink.query.filter(
+                DiscoveredJoinLink.owner_id == previous_job.owner_id,
+                DiscoveredJoinLink.id.in_(selected_link_ids),
+            ).all()
+        }
+        # Preserve the original selected order and discard only URLs already
+        # assigned to this account. No global/source URL is added here.
+        source_rows = [
+            rows_by_id[link_id] for link_id in selected_link_ids
+            if link_id in rows_by_id and rows_by_id[link_id].url_hash not in used_hashes
+        ][:max_items]
+    else:
+        source_rows = _global_join_pool_for_mode(previous_job.owner_id, mode, exclude_hashes=used_hashes, limit=max_items)
     links = [_ensure_worker_link_for_account(previous_job.owner_id, previous_job.account_id, source) for source in source_rows]
 
     if not links:
@@ -1486,7 +1522,9 @@ def _create_next_join_batch(previous_job):
         account_id=previous_job.account_id,
         total_links=len(links),
         selection_mode=mode,
-        auto_continue=previous_job.auto_continue,
+        continuation_link_ids_json=previous_job.continuation_link_ids_json,
+        auto_continue=auto_continue,
+        auto_resume=previous_job.auto_resume,
         batch_pause_seconds=previous_job.batch_pause_seconds,
         max_batches=previous_job.max_batches,
         batch_index=previous_job.batch_index + 1,

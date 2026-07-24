@@ -19,7 +19,7 @@
   <div class="col-md-6 col-xl-3"><div class="stat-card"><span>طريقة الاختيار</span><strong>{{ job.selection_mode|ar_status }}</strong></div></div>
   <div class="col-md-6 col-xl-3"><div class="stat-card"><span>منضم مسبقاً</span><strong>{{ job.already_member_count }}</strong></div></div>
   <div class="col-md-6 col-xl-3"><div class="stat-card"><span>فشل</span><strong>{{ job.failed_count }}</strong></div></div>
-  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>متابعة الدفعات التالية</span><strong>{{ 'مفعّلة' if job.auto_continue else 'غير مفعّلة' }}</strong><small class="text-muted d-block mt-1">{% if job.selection_mode == 'selected' %}تُعطّل للروابط المحددة فقط{% else %}حسب إعدادات صاحب الحملة وقت البدء{% endif %}</small></div></div>
+  <div class="col-md-6 col-xl-3"><div class="stat-card"><span>متابعة الدفعات التالية</span><strong>{{ 'مفعّلة' if job.auto_continue else 'غير مفعّلة' }}</strong><small class="text-muted d-block mt-1">{% if job.selection_mode == 'selected' %}تتابع القائمة المحددة فقط{% else %}تُحدَّث من الإعدادات قبل الدفعة التالية{% endif %}</small></div></div>
   <div class="col-md-6 col-xl-3"><div class="stat-card"><span>استئناف حد Telegram تلقائياً</span><strong>{{ 'مفعّل' if job.auto_resume else 'غير مفعّل' }}</strong></div></div>
   <div class="col-md-6 col-xl-3"><div class="stat-card"><span>بدأت</span><strong>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '—' }}</strong></div></div>
   <div class="col-md-6 col-xl-3"><div class="stat-card"><span>انتهت</span><strong>{{ job.completed_at.strftime('%Y-%m-%d %H:%M') if job.completed_at else '—' }}</strong></div></div>

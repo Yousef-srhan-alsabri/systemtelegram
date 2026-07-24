@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import random
 
 from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for
@@ -321,7 +322,9 @@ def execute():
         flash("لا يمكن بدء حملة مكررة: يوجد انضمام نشط أو متوقف مؤقتاً للحساب/الحسابات المحددة.", "warning")
         return redirect(url_for("join_manager.index"))
 
-    pool_size = max_items if distribution_mode == "shared" else max_items * len(accounts)
+    # Keep every explicitly selected URL as the safe continuation scope.  The
+    # first job still contains only one batch; later batches consume this list.
+    pool_size = max(len(selected_ids), max_items) if join_mode == "selected" else (max_items if distribution_mode == "shared" else max_items * len(accounts))
     source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, pool_size, link_order, source_ids, include_imported)
     if not source_rows:
         flash("لا توجد روابط صالحة حسب الخيار المحدد. افحص الروابط أولاً أو غيّر خيار الانضمام.", "danger")
@@ -331,22 +334,16 @@ def execute():
     resume_after_floodwait = get_bool(current_user.id, "JOIN_RESUME_AFTER_FLOODWAIT", current_app.config.get("JOIN_RESUME_AFTER_FLOODWAIT", True))
     batch_pause_seconds = get_int(current_user.id, "JOIN_BATCH_PAUSE_SECONDS", current_app.config.get("JOIN_BATCH_PAUSE_SECONDS", 300))
     max_batches = get_int(current_user.id, "JOIN_MAX_BATCHES_PER_RUN", current_app.config.get("JOIN_MAX_BATCHES_PER_RUN", 5))
-    if join_mode == "selected":
-        # A selected job must never pick unrelated links in a following batch.
-        # FloodWait monitoring/resume remains enabled independently in the worker.
-        auto_continue = False
-        max_batches = 1
-
     assignments = {}
     if distribution_mode == "random":
         random.shuffle(source_rows)
     for index, account in enumerate(accounts):
         if distribution_mode == "shared":
-            chosen = source_rows[:max_items]
+            chosen = source_rows if join_mode == "selected" else source_rows[:max_items]
         elif distribution_mode in {"chunks", "random"}:
-            chosen = source_rows[index * max_items:(index + 1) * max_items]
+            chosen = source_rows[index::len(accounts)] if join_mode == "selected" else source_rows[index * max_items:(index + 1) * max_items]
         else:
-            chosen = source_rows[index::len(accounts)][:max_items]
+            chosen = source_rows[index::len(accounts)] if join_mode == "selected" else source_rows[index::len(accounts)][:max_items]
         assignments[account.id] = chosen
 
     created_jobs = []
@@ -354,11 +351,13 @@ def execute():
         account_rows = [_ensure_link_for_account(current_user.id, account.id, row) for row in assignments[account.id]]
         if not account_rows:
             continue
+        first_batch_rows = account_rows[:max_items]
         job = JoinJob(
             owner_id=current_user.id,
             account_id=account.id,
-            total_links=len(account_rows),
+            total_links=len(first_batch_rows),
             selection_mode=join_mode,
+            continuation_link_ids_json=json.dumps([row.id for row in account_rows]) if join_mode == "selected" else None,
             auto_continue=auto_continue,
             auto_resume=resume_after_floodwait,
             batch_pause_seconds=batch_pause_seconds,
@@ -367,7 +366,7 @@ def execute():
         )
         db.session.add(job)
         db.session.flush()
-        db.session.add_all([JoinJobItem(join_job_id=job.id, discovered_link_id=row.id) for row in account_rows])
+        db.session.add_all([JoinJobItem(join_job_id=job.id, discovered_link_id=row.id) for row in first_batch_rows])
         created_jobs.append(job)
 
     if not created_jobs:

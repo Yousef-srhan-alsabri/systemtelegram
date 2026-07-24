@@ -83,6 +83,7 @@ def ensure_legacy_columns():
         columns = {column["name"] for column in inspector.get_columns("join_jobs")}
         additions = {
             "selection_mode": "VARCHAR(32) NOT NULL DEFAULT 'selected'",
+            "continuation_link_ids_json": "TEXT",
             "auto_continue": f"BOOLEAN NOT NULL DEFAULT {_bool_default(False)}",
             "batch_pause_seconds": "INTEGER NOT NULL DEFAULT 300",
             "max_batches": "INTEGER NOT NULL DEFAULT 1",

@@ -380,6 +380,9 @@ class JoinJob(db.Model):
     account_id = db.Column(db.Integer, db.ForeignKey("telegram_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
     status = db.Column(db.String(32), default="queued", nullable=False, index=True)
     selection_mode = db.Column(db.String(32), default="selected", nullable=False)
+    # Preserves an explicit selection across automatic batches without adding
+    # unrelated links from the global pool.
+    continuation_link_ids_json = db.Column(db.Text, nullable=True)
     auto_continue = db.Column(db.Boolean, default=False, nullable=False)
     batch_pause_seconds = db.Column(db.Integer, default=300, nullable=False)
     max_batches = db.Column(db.Integer, default=1, nullable=False)
