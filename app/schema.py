@@ -24,9 +24,19 @@ def _dt_type() -> str:
 
 def _add_column(table: str, name: str, definition: str, columns: set[str]):
     if name not in columns:
-        db.session.execute(text(f"ALTER TABLE {_q(table)} ADD COLUMN {_q(name)} {definition}"))
-        db.session.commit()
-        columns.add(name)
+        try:
+            db.session.execute(text(f"ALTER TABLE {_q(table)} ADD COLUMN {_q(name)} {definition}"))
+            db.session.commit()
+            columns.add(name)
+        except Exception as e:
+            # If column already exists (DuplicateColumn error), just skip it
+            if "already exists" in str(e) or "duplicate" in str(e).lower():
+                columns.add(name)
+                db.session.rollback()
+            else:
+                # Re-raise other errors
+                db.session.rollback()
+                raise
 
 
 def ensure_legacy_columns():
@@ -104,3 +114,4 @@ def ensure_legacy_columns():
         _add_column("channel_posts", "scheduled_at", _dt_type(), columns)
         _add_column("channel_posts", "auto_pin", f"BOOLEAN NOT NULL DEFAULT {_bool_default(False)}", columns)
         _add_column("channel_posts", "pinned_at", _dt_type(), columns)
+
