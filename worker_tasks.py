@@ -1738,8 +1738,8 @@ async def _inspect_join_links(account_id, link_ids):
                     db.session.commit()
                     await asyncio.sleep(max(1, int(exc.seconds)))
             if index < len(rows) - 1:
-                low = max(0.0, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
-                high = max(low, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
+                low = max(0.0, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
+                high = max(low, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
                 await asyncio.sleep(random.uniform(low, high))
         return {"status": "completed", "count": len(rows)}
     finally:
