@@ -33,6 +33,13 @@ JOINABLE_POOL_STATUSES = [
     "joined",
     "join_request_pending",
 ]
+SUBMITTABLE_JOIN_STATUSES = [
+    "discovered",
+    "check_failed",
+    "valid_public",
+    "valid_invite",
+    "join_request_pending",
+]
 
 
 def _dedupe_by_hash(rows):
@@ -55,7 +62,6 @@ def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max
     """
     query = DiscoveredJoinLink.query.filter(
         DiscoveredJoinLink.owner_id == owner_id,
-        DiscoveredJoinLink.status.in_(JOINABLE_POOL_STATUSES),
     )
     if source_ids:
         # Links obtained from a source channel are tied to its scan job.  Keep
@@ -64,10 +70,16 @@ def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max
     elif not include_imported:
         query = query.filter(DiscoveredJoinLink.scan_job_id.isnot(None))
 
+    if mode != "selected":
+        query = query.filter(DiscoveredJoinLink.status.in_(SUBMITTABLE_JOIN_STATUSES))
+
     if mode == "selected":
         if not selected_ids:
             return []
-        query = query.filter(DiscoveredJoinLink.id.in_(selected_ids))
+        query = query.filter(
+            DiscoveredJoinLink.id.in_(selected_ids),
+            DiscoveredJoinLink.status.in_(SUBMITTABLE_JOIN_STATUSES),
+        )
     elif mode == "all_valid":
         pass
     elif mode == "groups":
@@ -335,15 +347,30 @@ def execute():
     batch_pause_seconds = get_int(current_user.id, "JOIN_BATCH_PAUSE_SECONDS", current_app.config.get("JOIN_BATCH_PAUSE_SECONDS", 300))
     max_batches = get_int(current_user.id, "JOIN_MAX_BATCHES_PER_RUN", current_app.config.get("JOIN_MAX_BATCHES_PER_RUN", 5))
     assignments = {}
+    account_existing_hashes = {
+        account.id: {
+            value for (value,) in db.session.query(DiscoveredJoinLink.url_hash)
+            .filter(
+                DiscoveredJoinLink.owner_id == current_user.id,
+                DiscoveredJoinLink.account_id == account.id,
+                DiscoveredJoinLink.status.in_(["already_member", "joined"]),
+            ).all()
+        }
+        for account in accounts
+    }
     if distribution_mode == "random":
         random.shuffle(source_rows)
     for index, account in enumerate(accounts):
-        if distribution_mode == "shared":
-            chosen = source_rows if join_mode == "selected" else source_rows[:max_items]
+        if join_mode == "selected":
+            chosen = source_rows
+        elif distribution_mode == "shared":
+            chosen = source_rows[:max_items]
         elif distribution_mode in {"chunks", "random"}:
             chosen = source_rows[index::len(accounts)] if join_mode == "selected" else source_rows[index * max_items:(index + 1) * max_items]
         else:
-            chosen = source_rows[index::len(accounts)] if join_mode == "selected" else source_rows[index::len(accounts)][:max_items]
+            chosen = source_rows[index::len(accounts)][:max_items]
+        if account_existing_hashes.get(account.id):
+            chosen = [row for row in chosen if row.url_hash not in account_existing_hashes[account.id]]
         assignments[account.id] = chosen
 
     created_jobs = []
