@@ -615,14 +615,7 @@ def _system_source_identity_sets(owner_id):
             ids.add(abs(int(setting.channel_id)))
         if setting.channel_title:
             titles.add(setting.channel_title.strip().lower())
-    for source in JoinSource.query.filter_by(owner_id=owner_id).all():
-        username = _username_from_ref(source.source_channel_ref)
-        if username:
-            usernames.add(username)
-        if source.source_channel_id:
-            ids.add(abs(int(source.source_channel_id)))
-        if source.source_channel_title:
-            titles.add(source.source_channel_title.strip().lower())
+    # JoinManager source channels are not treated as generic system sources here.
     return usernames, ids, titles
 
 
@@ -1141,35 +1134,44 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
                 job.chats_scanned += 1
                 title = dialog.name or entity_title(dialog.entity)
                 try:
-                    async for message in client.iter_messages(dialog.entity, limit=limit):
-                        message_date = getattr(message, "date", None)
-                        if job.start_date and message_date and message_date < job.start_date:
-                            break
-                        job.messages_scanned += 1
-                        links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp" and _is_whatsapp_group_link(item)]
-                        if not links:
-                            continue
-                        job.links_found += len(links)
-                        source_url = public_message_url(username, int(message.id))
-                        for link in links:
-                            existing = WhatsAppLink.query.filter_by(scan_job_id=job.id, url_hash=link.url_hash).first()
-                            if existing:
+                    seen_message_ids = set()
+                    whatsapp_search_terms = ["chat.whatsapp.com", "wa.me", "whatsapp.com"]
+                    search_limit = min(max(20, limit), 200)
+                    for term in whatsapp_search_terms:
+                        async for message in client.iter_messages(dialog.entity, search=term, limit=search_limit):
+                            message_id = getattr(message, "id", None)
+                            if not message_id or message_id in seen_message_ids:
                                 continue
-                            db.session.add(WhatsAppLink(
-                                owner_id=job.owner_id,
-                                scan_job_id=job.id,
-                                account_id=account.id,
-                                url=link.url,
-                                url_hash=link.url_hash,
-                                source_title=title,
-                                source_username=username,
-                                source_type=kind or "private",
-                                source_message_id=int(message.id),
-                                source_message_url=source_url,
-                                message_date=message_date,
-                            ))
-                            job.unique_links += 1
-                        db.session.commit()
+                            seen_message_ids.add(message_id)
+                            message_date = getattr(message, "date", None)
+                            if job.start_date and message_date and message_date < job.start_date:
+                                continue
+                            job.messages_scanned += 1
+                            links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp" and _is_whatsapp_group_link(item)]
+                            if not links:
+                                continue
+                            job.links_found += len(links)
+                            source_url = public_message_url(username, int(message.id))
+                            for link in links:
+                                existing = WhatsAppLink.query.filter_by(scan_job_id=job.id, url_hash=link.url_hash).first()
+                                if existing:
+                                    continue
+                                db.session.add(WhatsAppLink(
+                                    owner_id=job.owner_id,
+                                    scan_job_id=job.id,
+                                    account_id=account.id,
+                                    url=link.url,
+                                    url_hash=link.url_hash,
+                                    source_title=title,
+                                    source_username=username,
+                                    source_type=kind or "private",
+                                    source_message_id=int(message.id),
+                                    source_message_url=source_url,
+                                    message_date=message_date,
+                                ))
+                                job.unique_links += 1
+                            db.session.commit()
+                    
                 except FloodWaitError as exc:
                     errors.append(f"account {account.id}: FloodWait {exc.seconds}s")
                     break
