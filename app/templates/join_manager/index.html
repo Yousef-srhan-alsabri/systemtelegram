@@ -180,7 +180,7 @@
             {% for l in links %}
               {% set is_valid = l.status in ['valid_public','valid_invite','already_member','joined','join_request_pending'] %}
               <tr>
-                <td><input class="form-check-input join-link-check" type="checkbox" name="link_ids" value="{{ l.id }}" data-type="{{ l.entity_type or '' }}" data-invite="{{ 1 if l.invite_hash else 0 }}" data-approval="{{ 1 if l.requires_approval else 0 }}" {% if not is_valid %}disabled{% endif %}></td>
+                <td><input class="form-check-input join-link-check" type="checkbox" name="link_ids" value="{{ l.id }}" data-type="{{ l.entity_type or '' }}" data-invite="{{ 1 if l.invite_hash else 0 }}" data-approval="{{ 1 if l.requires_approval else 0 }}" data-source="{{ 'source' if l.scan_job_id else 'search' }}" {% if not is_valid %}disabled{% endif %}></td>
                 <td>{{ l.entity_title or 'غير معروف' }}</td>
                 <td class="text-break"><a target="_blank" rel="noopener" href="{{ l.url }}">{{ l.url }}</a></td>
                 <td>
