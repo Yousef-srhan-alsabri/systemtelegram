@@ -181,13 +181,14 @@
               {% set is_valid = l.status in ['valid_public','valid_invite','already_member','joined','join_request_pending'] %}
               <tr>
                 <td><input class="form-check-input join-link-check" type="checkbox" name="link_ids" value="{{ l.id }}" data-type="{{ l.entity_type or '' }}" data-invite="{{ 1 if l.invite_hash else 0 }}" data-approval="{{ 1 if l.requires_approval else 0 }}" data-source="{{ 'source' if l.scan_job_id else 'search' }}" {% if not is_valid %}disabled{% endif %}></td>
-                <td>{{ l.entity_title or 'غير معروف' }}</td>
+                <td>{{ l.entity_title or l.username or (l.invite_hash and 'دعوة تيليجرام') or 'غير معروف' }}</td>
                 <td class="text-break"><a target="_blank" rel="noopener" href="{{ l.url }}">{{ l.url }}</a></td>
                 <td>
                   {% if l.entity_type == 'group' %}<span class="badge text-bg-primary">قروب</span>
                   {% elif l.entity_type == 'channel' %}<span class="badge text-bg-info">قناة</span>
+                  {% elif l.invite_hash %}<span class="badge text-bg-secondary">دعوة تيليجرام</span>
                   {% else %}<span class="badge text-bg-secondary">بانتظار التحقق عند الانضمام</span>{% endif %}
-                  {% if l.invite_hash %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
+                  {% if l.invite_hash and l.entity_type %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
                 </td>
                 <td>
                   <span class="status-pill status-{{ l.status }}">{{ l.status|ar_status }}</span>
@@ -303,10 +304,11 @@ function linkMatchesMode(box, mode, sourceMode) {
   const approval = box.dataset.approval === '1';
   const source = box.dataset.source || 'all';
   const sourceMatch = sourceMode === 'all' || sourceMode === source;
+  const unknown = !type && !invite && box.dataset.approval !== '1';
   return sourceMatch && (
     mode === 'all' ||
-    (mode === 'groups' && type === 'group') ||
-    (mode === 'channels' && type === 'channel') ||
+    (mode === 'groups' && (type === 'group' || invite || unknown)) ||
+    (mode === 'channels' && (type === 'channel' || unknown)) ||
     (mode === 'invites' && invite) ||
     (mode === 'approval' && approval)
   );

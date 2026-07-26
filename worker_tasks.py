@@ -562,9 +562,11 @@ def _prepare_join_link_for_execution(row):
     row.checked_at = utcnow()
     if target.kind == "invite":
         row.invite_hash = target.value
+        row.entity_title = row.entity_title or "دعوة تيليجرام"
         row.status = "valid_invite"
     elif target.kind == "username":
         row.username = target.value
+        row.entity_title = row.entity_title or target.value
         row.status = "valid_public"
     else:
         row.status = "unsupported"

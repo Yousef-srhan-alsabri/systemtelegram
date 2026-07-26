@@ -98,9 +98,17 @@ def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max
     if mode == "all_valid":
         pass
     elif mode == "groups":
-        query = query.filter(DiscoveredJoinLink.entity_type == "group")
+        query = query.filter(
+            or_(
+                DiscoveredJoinLink.entity_type == "group",
+                DiscoveredJoinLink.invite_hash.isnot(None),
+                DiscoveredJoinLink.entity_type.is_(None),
+            )
+        )
     elif mode == "channels":
-        query = query.filter(DiscoveredJoinLink.entity_type == "channel")
+        query = query.filter(
+            or_(DiscoveredJoinLink.entity_type == "channel", DiscoveredJoinLink.entity_type.is_(None))
+        )
     elif mode == "invites":
         query = query.filter(DiscoveredJoinLink.invite_hash.isnot(None))
     elif mode == "approval_required":
