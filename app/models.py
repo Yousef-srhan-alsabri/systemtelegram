@@ -276,6 +276,7 @@ class WhatsAppScanJob(db.Model):
     export_mode = db.Column(db.String(24), default="pdf", nullable=False)
     export_channel_ref = db.Column(db.String(500), nullable=True)
     export_account_id = db.Column(db.Integer, db.ForeignKey("telegram_accounts.id", ondelete="SET NULL"), nullable=True)
+    exclude_system_sources = db.Column(db.Boolean, default=True, nullable=False)
     messages_scanned = db.Column(db.Integer, default=0, nullable=False)
     chats_scanned = db.Column(db.Integer, default=0, nullable=False)
     links_found = db.Column(db.Integer, default=0, nullable=False)

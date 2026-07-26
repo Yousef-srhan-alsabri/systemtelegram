@@ -19,6 +19,8 @@ from app.models import (
     TelegramAccount,
     WhatsAppLink,
 )
+from sqlalchemy import or_
+
 from app.services.audit import log_action
 from app.services.discovery import parse_telegram_link
 from app.services.settings import get_bool, get_int
@@ -31,6 +33,13 @@ JOINABLE_POOL_STATUSES = [
     "valid_invite",
     "already_member",
     "joined",
+    "join_request_pending",
+]
+SUBMITTABLE_JOIN_STATUSES = [
+    "discovered",
+    "check_failed",
+    "valid_public",
+    "valid_invite",
     "join_request_pending",
 ]
 
@@ -46,7 +55,7 @@ def _dedupe_by_hash(rows):
     return result
 
 
-def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max_items: int, link_order: str = "newest", source_ids: list[int] | None = None, include_imported: bool = True):
+def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max_items: int, link_order: str = "newest", source_ids: list[int] | None = None, source_mode: str = "all"):
     """Return link rows from the owner's global discovered pool.
 
     The returned rows are used as a source pool and are cloned per target account.
@@ -55,25 +64,51 @@ def _source_rows_for_mode(owner_id: int, mode: str, selected_ids: list[int], max
     """
     query = DiscoveredJoinLink.query.filter(
         DiscoveredJoinLink.owner_id == owner_id,
-        DiscoveredJoinLink.status.in_(JOINABLE_POOL_STATUSES),
     )
-    if source_ids:
-        # Links obtained from a source channel are tied to its scan job.  Keep
-        # search-imported links optional because they have no JoinScanJob.
-        query = query.join(JoinScanJob, DiscoveredJoinLink.scan_job_id == JoinScanJob.id).filter(JoinScanJob.source_id.in_(source_ids))
-    elif not include_imported:
-        query = query.filter(DiscoveredJoinLink.scan_job_id.isnot(None))
+    source_ids = source_ids or []
 
     if mode == "selected":
         if not selected_ids:
             return []
-        query = query.filter(DiscoveredJoinLink.id.in_(selected_ids))
-    elif mode == "all_valid":
+        query = query.filter(
+            DiscoveredJoinLink.id.in_(selected_ids),
+            DiscoveredJoinLink.status.in_(SUBMITTABLE_JOIN_STATUSES),
+        )
+    else:
+        query = query.filter(DiscoveredJoinLink.status.in_(SUBMITTABLE_JOIN_STATUSES))
+
+    if source_mode == "search_only":
+        query = query.filter(DiscoveredJoinLink.scan_job_id.is_(None))
+    elif source_mode == "source_only":
+        if source_ids:
+            source_job_ids = [
+                value for (value,) in db.session.query(JoinScanJob.id)
+                .filter(JoinScanJob.source_id.in_(source_ids)).all()
+            ]
+            query = query.filter(DiscoveredJoinLink.scan_job_id.in_(source_job_ids))
+        else:
+            query = query.filter(DiscoveredJoinLink.scan_job_id.isnot(None))
+    elif source_ids:
+        source_job_ids = [
+            value for (value,) in db.session.query(JoinScanJob.id)
+            .filter(JoinScanJob.source_id.in_(source_ids)).all()
+        ]
+        query = query.filter(or_(DiscoveredJoinLink.scan_job_id.is_(None), DiscoveredJoinLink.scan_job_id.in_(source_job_ids)))
+
+    if mode == "all_valid":
         pass
     elif mode == "groups":
-        query = query.filter(DiscoveredJoinLink.entity_type == "group")
+        query = query.filter(
+            or_(
+                DiscoveredJoinLink.entity_type == "group",
+                DiscoveredJoinLink.invite_hash.isnot(None),
+                DiscoveredJoinLink.entity_type.is_(None),
+            )
+        )
     elif mode == "channels":
-        query = query.filter(DiscoveredJoinLink.entity_type == "channel")
+        query = query.filter(
+            or_(DiscoveredJoinLink.entity_type == "channel", DiscoveredJoinLink.entity_type.is_(None))
+        )
     elif mode == "invites":
         query = query.filter(DiscoveredJoinLink.invite_hash.isnot(None))
     elif mode == "approval_required":
@@ -135,6 +170,10 @@ def index():
     sources = JoinSource.query.filter_by(owner_id=current_user.id).order_by(JoinSource.id.desc()).all()
     links = DiscoveredJoinLink.query.filter_by(owner_id=current_user.id).order_by(DiscoveredJoinLink.id.desc()).limit(1000).all()
     jobs = JoinJob.query.filter_by(owner_id=current_user.id).order_by(JoinJob.id.desc()).limit(20).all()
+    active_join_jobs = JoinJob.query.filter(
+        JoinJob.owner_id == current_user.id,
+        JoinJob.status.in_(["queued", "running", "paused", "paused_rate_limit"]),
+    ).order_by(JoinJob.id.desc()).all()
     active_join_account_ids = [account_id for (account_id,) in db.session.query(JoinJob.account_id).filter(
         JoinJob.owner_id == current_user.id,
         JoinJob.status.in_(["queued", "running", "paused", "stopped", "paused_rate_limit"]),
@@ -156,6 +195,7 @@ def index():
         sources=sources,
         links=links,
         jobs=jobs,
+        active_join_jobs=active_join_jobs,
         active_join_account_ids=active_join_account_ids,
         scans=scans,
         join_stats=join_stats,
@@ -165,6 +205,7 @@ def index():
         max_batches=get_int(current_user.id, "JOIN_MAX_BATCHES_PER_RUN", current_app.config.get("JOIN_MAX_BATCHES_PER_RUN", 5)),
         resume_after_floodwait=get_bool(current_user.id, "JOIN_RESUME_AFTER_FLOODWAIT", current_app.config.get("JOIN_RESUME_AFTER_FLOODWAIT", True)),
         max_floodwait_sleep=get_int(current_user.id, "JOIN_MAX_FLOODWAIT_SLEEP_SECONDS", current_app.config.get("JOIN_MAX_FLOODWAIT_SLEEP_SECONDS", 3600)),
+        default_link_source_mode="all",
     )
 
 
@@ -294,7 +335,9 @@ def execute():
 
     join_mode = request.form.get("join_mode", "selected")
     source_ids = [int(v) for v in request.form.getlist("source_ids") if str(v).isdigit()]
-    include_imported = request.form.get("include_imported") == "1"
+    link_source_mode = request.form.get("link_source_mode", "all")
+    if link_source_mode not in {"all", "source_only", "search_only"}:
+        link_source_mode = "all"
     distribution_mode = request.form.get("distribution_mode", "shared")
     link_order = request.form.get("link_order", "newest")
     if distribution_mode not in {"shared", "round_robin", "chunks", "random"}:
@@ -325,7 +368,7 @@ def execute():
     # Keep every explicitly selected URL as the safe continuation scope.  The
     # first job still contains only one batch; later batches consume this list.
     pool_size = max(len(selected_ids), max_items) if join_mode == "selected" else (max_items if distribution_mode == "shared" else max_items * len(accounts))
-    source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, pool_size, link_order, source_ids, include_imported)
+    source_rows = _source_rows_for_mode(current_user.id, join_mode, selected_ids, pool_size, link_order, source_ids, link_source_mode)
     if not source_rows:
         flash("لا توجد روابط صالحة حسب الخيار المحدد. افحص الروابط أولاً أو غيّر خيار الانضمام.", "danger")
         return redirect(url_for("join_manager.index"))
@@ -335,15 +378,30 @@ def execute():
     batch_pause_seconds = get_int(current_user.id, "JOIN_BATCH_PAUSE_SECONDS", current_app.config.get("JOIN_BATCH_PAUSE_SECONDS", 300))
     max_batches = get_int(current_user.id, "JOIN_MAX_BATCHES_PER_RUN", current_app.config.get("JOIN_MAX_BATCHES_PER_RUN", 5))
     assignments = {}
+    account_existing_hashes = {
+        account.id: {
+            value for (value,) in db.session.query(DiscoveredJoinLink.url_hash)
+            .filter(
+                DiscoveredJoinLink.owner_id == current_user.id,
+                DiscoveredJoinLink.account_id == account.id,
+                DiscoveredJoinLink.status.in_(["already_member", "joined"]),
+            ).all()
+        }
+        for account in accounts
+    }
     if distribution_mode == "random":
         random.shuffle(source_rows)
     for index, account in enumerate(accounts):
-        if distribution_mode == "shared":
-            chosen = source_rows if join_mode == "selected" else source_rows[:max_items]
+        if join_mode == "selected":
+            chosen = source_rows
+        elif distribution_mode == "shared":
+            chosen = source_rows[:max_items]
         elif distribution_mode in {"chunks", "random"}:
             chosen = source_rows[index::len(accounts)] if join_mode == "selected" else source_rows[index * max_items:(index + 1) * max_items]
         else:
-            chosen = source_rows[index::len(accounts)] if join_mode == "selected" else source_rows[index::len(accounts)][:max_items]
+            chosen = source_rows[index::len(accounts)][:max_items]
+        if account_existing_hashes.get(account.id):
+            chosen = [row for row in chosen if row.url_hash not in account_existing_hashes[account.id]]
         assignments[account.id] = chosen
 
     created_jobs = []

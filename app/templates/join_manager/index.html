@@ -82,7 +82,7 @@
   </div>
 
   <div class="tab-pane fade" id="joinExecuteTab">
-    <form method="post" action="{{ url_for('join_manager.execute') }}" id="joinExecuteForm" class="panel-card overflow-hidden">
+    <form method="post" action="{{ url_for('join_manager.execute') }}" id="joinExecuteForm" data-active-account-ids="{{ active_join_account_ids|join(',') }}" class="panel-card overflow-hidden">
       <div class="join-command-panel">
         <div>
           <div class="d-flex justify-content-between align-items-center mb-2"><label class="form-label mb-0">حسابات التنفيذ</label><span class="count-badge" id="selectedAccountsCount">0 حساب محدد</span></div>
@@ -119,8 +119,13 @@
           <select class="form-select" name="source_ids" multiple size="4">
             {% for s in sources %}<option value="{{ s.id }}">{{ s.source_channel_title or s.source_channel_ref }}</option>{% endfor %}
           </select>
-          <label class="source-mode-pill d-flex mt-2"><input class="form-check-input me-2" type="checkbox" name="include_imported" value="1" checked> تضمين الروابط المستوردة من البحث</label>
-          <div class="join-mode-note mt-2">اترك المصادر بلا اختيار لاستخدام كل قنوات المصادر.</div>
+          <label class="form-label mt-3">مصدر الروابط</label>
+          <select class="form-select" name="link_source_mode" id="linkSourceMode">
+            <option value="all"{% if default_link_source_mode == 'all' %} selected{% endif %}>كل الروابط (المصدر + البحث)</option>
+            <option value="source_only"{% if default_link_source_mode == 'source_only' %} selected{% endif %}>من قناة المصدر فقط</option>
+            <option value="search_only"{% if default_link_source_mode == 'search_only' %} selected{% endif %}>من نتائج البحث فقط</option>
+          </select>
+          <div class="join-mode-note mt-2">يمكنك اختيار الانضمام من نتائج البحث، أو من قنوات المصدر، أو من الاثنين معاً.</div>
         </div>
 
         <div>
@@ -175,14 +180,15 @@
             {% for l in links %}
               {% set is_valid = l.status in ['valid_public','valid_invite','already_member','joined','join_request_pending'] %}
               <tr>
-                <td><input class="form-check-input join-link-check" type="checkbox" name="link_ids" value="{{ l.id }}" data-type="{{ l.entity_type or '' }}" data-invite="{{ 1 if l.invite_hash else 0 }}" data-approval="{{ 1 if l.requires_approval else 0 }}" {% if not is_valid %}disabled{% endif %}></td>
-                <td>{{ l.entity_title or 'غير معروف' }}</td>
+                <td><input class="form-check-input join-link-check" type="checkbox" name="link_ids" value="{{ l.id }}" data-type="{{ l.entity_type or '' }}" data-invite="{{ 1 if l.invite_hash else 0 }}" data-approval="{{ 1 if l.requires_approval else 0 }}" data-source="{{ 'source' if l.scan_job_id else 'search' }}" {% if not is_valid %}disabled{% endif %}></td>
+                <td>{{ l.entity_title or l.username or (l.invite_hash and 'دعوة تيليجرام') or 'غير معروف' }}</td>
                 <td class="text-break"><a target="_blank" rel="noopener" href="{{ l.url }}">{{ l.url }}</a></td>
                 <td>
                   {% if l.entity_type == 'group' %}<span class="badge text-bg-primary">قروب</span>
                   {% elif l.entity_type == 'channel' %}<span class="badge text-bg-info">قناة</span>
+                  {% elif l.invite_hash %}<span class="badge text-bg-secondary">دعوة تيليجرام</span>
                   {% else %}<span class="badge text-bg-secondary">بانتظار التحقق عند الانضمام</span>{% endif %}
-                  {% if l.invite_hash %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
+                  {% if l.invite_hash and l.entity_type %}<span class="badge text-bg-light border">دعوة</span>{% endif %}
                 </td>
                 <td>
                   <span class="status-pill status-{{ l.status }}">{{ l.status|ar_status }}</span>
@@ -202,6 +208,40 @@
 
   <div class="tab-pane fade" id="joinHistoryTab">
     <div class="row g-4">
+      <div class="col-12">
+        <div class="panel-card mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h2 class="h5 mb-1">الحملات النشطة</h2>
+              <p class="small text-muted mb-0">عرض سريع للحملات التي لا تزال قيد التنفيذ أو في الانتظار.</p>
+            </div>
+            <span class="badge text-bg-primary">{{ active_join_jobs|length }} حملة نشطة</span>
+          </div>
+          {% if active_join_jobs %}
+            <div class="table-responsive">
+              <table class="table mb-0">
+                <thead><tr><th>#</th><th>الحساب</th><th>الحالة</th><th>دفعة</th><th>الروابط</th><th>انضم</th><th>طلبات</th><th>سبب التوقف</th></tr></thead>
+                <tbody>
+                  {% for j in active_join_jobs %}
+                    <tr>
+                      <td>{{ j.id }}</td>
+                      <td>{{ j.account_id }}</td>
+                      <td><span class="status-pill status-{{ j.status }}">{{ j.status|ar_status }}</span></td>
+                      <td>{{ j.batch_index or 1 }}/{{ j.max_batches or 1 }}</td>
+                      <td>{{ j.total_links }}</td>
+                      <td>{{ j.joined_count }}</td>
+                      <td>{{ j.request_pending_count }}</td>
+                      <td>{{ j.stopped_reason or '-' }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="empty-state">لا توجد حملات انضمام نشطة حالياً.</div>
+          {% endif %}
+        </div>
+      </div>
       <div class="col-xl-5">
         <div class="panel-card">
           <div class="panel-heading"><h2 class="h5 mb-0">عمليات الفحص</h2></div>
@@ -257,16 +297,21 @@
 <script>
 let joinSelectionRun = 0;
 
-function linkMatchesMode(box, mode) {
+function linkMatchesMode(box, mode, sourceMode) {
   if (box.disabled || mode === 'none') return false;
   const type = box.dataset.type;
   const invite = box.dataset.invite === '1';
   const approval = box.dataset.approval === '1';
-  return mode === 'all' ||
-    (mode === 'groups' && type === 'group') ||
-    (mode === 'channels' && type === 'channel') ||
+  const source = box.dataset.source || 'all';
+  const sourceMatch = sourceMode === 'all' || sourceMode === source;
+  const unknown = !type && !invite && box.dataset.approval !== '1';
+  return sourceMatch && (
+    mode === 'all' ||
+    (mode === 'groups' && (type === 'group' || invite || unknown)) ||
+    (mode === 'channels' && (type === 'channel' || unknown)) ||
     (mode === 'invites' && invite) ||
-    (mode === 'approval' && approval);
+    (mode === 'approval' && approval)
+  );
 }
 
 function selectedJoinAccountsCount() {
@@ -301,6 +346,7 @@ function selectJoinLinks(mode, keepExecutionMode = false) {
   const boxes = Array.from(document.querySelectorAll('.join-link-check'));
   const toggleAll = document.getElementById('toggleAllJoinLinks');
   const joinMode = document.getElementById('joinMode');
+  const sourceMode = document.getElementById('linkSourceMode')?.value || 'all';
   // Yield frequently: selecting a large discovery list must never freeze clicks
   // or the browser's rendering thread.
   const batchSize = 30;
@@ -312,7 +358,7 @@ function selectJoinLinks(mode, keepExecutionMode = false) {
     if (runId !== joinSelectionRun) return;
     const end = Math.min(index + batchSize, boxes.length);
     for (; index < end; index += 1) {
-      boxes[index].checked = linkMatchesMode(boxes[index], mode);
+      boxes[index].checked = linkMatchesMode(boxes[index], mode, sourceMode);
     }
     if (index < boxes.length) {
       if (window.requestIdleCallback) window.requestIdleCallback(applyBatch, { timeout: 80 });
@@ -359,6 +405,21 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('selectChannelsBtn')?.addEventListener('click', () => selectJoinLinks('channels'));
   document.getElementById('selectInvitesBtn')?.addEventListener('click', () => selectJoinLinks('invites'));
   document.getElementById('selectApprovalBtn')?.addEventListener('click', () => selectJoinLinks('approval'));
+  document.getElementById('linkSourceMode')?.addEventListener('change', () => {
+    const mode = document.getElementById('joinMode')?.value || 'selected';
+    const modeMap = {
+      all_valid: 'all',
+      groups: 'groups',
+      channels: 'channels',
+      invites: 'invites',
+      approval_required: 'approval',
+    };
+    if (mode === 'selected') {
+      updateSelectedLinksCount(true);
+    } else {
+      selectJoinLinks(modeMap[mode] || 'all', true);
+    }
+  });
   document.getElementById('clearLinksBtn')?.addEventListener('click', () => selectJoinLinks('none'));
   document.getElementById('joinMode')?.addEventListener('change', event => {
     const map = {
@@ -373,7 +434,8 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', () => updateSelectedLinksCount(false)));
   document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
-    const busy = new Set({{ active_join_account_ids|tojson }});
+    const activeData = document.getElementById('joinExecuteForm')?.dataset.activeAccountIds || '';
+    const busy = new Set(activeData.split(',').filter(Boolean).map(Number));
     const selectedBusy = Array.from(document.querySelectorAll('.join-account-checkbox:checked')).some(box => busy.has(Number(box.value)));
     if (selectedBusy) {
       event.preventDefault();

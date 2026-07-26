@@ -520,7 +520,8 @@ def _extract_message_links(message):
     successfully but discover zero links.
     """
     text = getattr(message, "message", None) or ""
-    candidates = [text]
+    caption = getattr(message, "caption", None) or ""
+    candidates = [text, caption]
 
     # Hidden links inside message entities, including MessageEntityTextUrl.
     for entity in getattr(message, "entities", None) or []:
@@ -561,9 +562,11 @@ def _prepare_join_link_for_execution(row):
     row.checked_at = utcnow()
     if target.kind == "invite":
         row.invite_hash = target.value
+        row.entity_title = row.entity_title or "دعوة تيليجرام"
         row.status = "valid_invite"
     elif target.kind == "username":
         row.username = target.value
+        row.entity_title = row.entity_title or target.value
         row.status = "valid_public"
     else:
         row.status = "unsupported"
@@ -604,6 +607,7 @@ def _username_from_ref(ref):
 def _system_source_identity_sets(owner_id):
     usernames = set()
     ids = set()
+    titles = set()
     setting = ExportSetting.query.filter_by(owner_id=owner_id).first()
     if setting:
         username = _username_from_ref(setting.channel_ref) or (setting.channel_username or "").lower()
@@ -611,25 +615,26 @@ def _system_source_identity_sets(owner_id):
             usernames.add(username)
         if setting.channel_id:
             ids.add(abs(int(setting.channel_id)))
-    for source in JoinSource.query.filter_by(owner_id=owner_id).all():
-        username = _username_from_ref(source.source_channel_ref)
-        if username:
-            usernames.add(username)
-        if source.source_channel_id:
-            ids.add(abs(int(source.source_channel_id)))
-    return usernames, ids
+        if setting.channel_title:
+            titles.add(setting.channel_title.strip().lower())
+    # JoinManager source channels are not treated as generic system sources here.
+    return usernames, ids, titles
 
 
-def _is_system_source(username=None, entity_id=None, usernames=None, ids=None):
+def _is_system_source(username=None, entity_id=None, usernames=None, ids=None, title=None, titles=None):
     usernames = usernames or set()
     ids = ids or set()
+    titles = titles or set()
     if username and username.lower() in usernames:
         return True
     if entity_id:
         try:
-            return abs(int(entity_id)) in ids
+            if abs(int(entity_id)) in ids:
+                return True
         except Exception:
-            return False
+            pass
+    if title and title.strip().lower() in titles:
+        return True
     return False
 
 
@@ -683,7 +688,7 @@ async def _execute_search_job(job_id):
     include_global = scope in {"global_only", "global_plus_joined"}
     include_public_messages = bool(getattr(job, "include_public_messages", True)) and include_global
     exclude_system_sources = bool(getattr(job, "exclude_system_sources", True))
-    base_system_usernames, base_system_ids = _system_source_identity_sets(job.owner_id) if exclude_system_sources else (set(), set())
+    base_system_usernames, base_system_ids, base_system_titles = _system_source_identity_sets(job.owner_id) if exclude_system_sources else (set(), set(), set())
     query_terms = _expanded_search_terms(job.query_text) if getattr(job, "expanded_queries_json", None) else [job.query_text]
     try:
         job.expanded_queries_json = json.dumps(query_terms, ensure_ascii=False)
@@ -702,8 +707,9 @@ async def _execute_search_job(job_id):
 
             system_usernames = set(base_system_usernames)
             system_ids = set(base_system_ids)
+            system_titles = set(base_system_titles) if exclude_system_sources else set()
             if exclude_system_sources:
-                await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids)
+                await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids, system_titles)
 
             dialogs = []
             member_ids = set()
@@ -1041,7 +1047,7 @@ def _write_simple_links_pdf(path, title, lines):
         handle.write(body.encode("latin-1", "ignore"))
 
 
-async def _add_export_ref_to_system_sets(client, channel_ref, usernames, ids):
+async def _add_export_ref_to_system_sets(client, channel_ref, usernames, ids, titles):
     username = _username_from_ref(channel_ref)
     if username:
         usernames.add(username)
@@ -1052,6 +1058,9 @@ async def _add_export_ref_to_system_sets(client, channel_ref, usernames, ids):
         entity_username = getattr(entity, "username", None)
         if entity_username:
             usernames.add(entity_username.lower())
+        entity_title = entity_title(entity)
+        if entity_title:
+            titles.add(entity_title.strip().lower())
         entity_id = getattr(entity, "id", None)
         if entity_id:
             ids.add(abs(int(entity_id)))
@@ -1059,14 +1068,14 @@ async def _add_export_ref_to_system_sets(client, channel_ref, usernames, ids):
         pass
 
 
-async def _resolve_system_sources_with_client(client, owner_id, usernames, ids):
+async def _resolve_system_sources_with_client(client, owner_id, usernames, ids, titles):
     refs = []
     setting = ExportSetting.query.filter_by(owner_id=owner_id).first()
     if setting and setting.channel_ref:
         refs.append(setting.channel_ref)
     refs.extend(source.source_channel_ref for source in JoinSource.query.filter_by(owner_id=owner_id).all() if source.source_channel_ref)
     for ref in refs:
-        await _add_export_ref_to_system_sets(client, ref, usernames, ids)
+        await _add_export_ref_to_system_sets(client, ref, usernames, ids, titles)
 
 
 def execute_whatsapp_scan_job(job_id, account_ids):
@@ -1107,9 +1116,11 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
                 errors.append(f"account {account.id}: unauthorized")
                 continue
 
-            system_usernames, system_ids = _system_source_identity_sets(job.owner_id)
-            await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids)
-            await _add_export_ref_to_system_sets(client, job.export_channel_ref, system_usernames, system_ids)
+            system_usernames, system_ids, system_titles = (set(), set(), set())
+            if getattr(job, "exclude_system_sources", True):
+                system_usernames, system_ids, system_titles = _system_source_identity_sets(job.owner_id)
+                await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids, system_titles)
+                await _add_export_ref_to_system_sets(client, job.export_channel_ref, system_usernames, system_ids, system_titles)
 
             dialogs = await client.get_dialogs(limit=None)
             for dialog in dialogs:
@@ -1118,41 +1129,51 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
                     continue
                 username = getattr(dialog.entity, "username", None)
                 entity_id = getattr(dialog.entity, "id", None)
-                if _is_system_source(username=username, entity_id=entity_id, usernames=system_usernames, ids=system_ids):
+                title = dialog.name or entity_title(dialog.entity)
+                if _is_system_source(username=username, entity_id=entity_id, title=title, usernames=system_usernames, ids=system_ids, titles=system_titles):
                     continue
 
                 job.chats_scanned += 1
                 title = dialog.name or entity_title(dialog.entity)
                 try:
-                    async for message in client.iter_messages(dialog.entity, limit=limit):
-                        message_date = getattr(message, "date", None)
-                        if job.start_date and message_date and message_date < job.start_date:
-                            break
-                        job.messages_scanned += 1
-                        links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp" and _is_whatsapp_group_link(item)]
-                        if not links:
-                            continue
-                        job.links_found += len(links)
-                        source_url = public_message_url(username, int(message.id))
-                        for link in links:
-                            existing = WhatsAppLink.query.filter_by(scan_job_id=job.id, url_hash=link.url_hash).first()
-                            if existing:
+                    seen_message_ids = set()
+                    whatsapp_search_terms = ["chat.whatsapp.com", "wa.me", "whatsapp.com"]
+                    search_limit = min(max(20, limit), 200)
+                    for term in whatsapp_search_terms:
+                        async for message in client.iter_messages(dialog.entity, search=term, limit=search_limit):
+                            message_id = getattr(message, "id", None)
+                            if not message_id or message_id in seen_message_ids:
                                 continue
-                            db.session.add(WhatsAppLink(
-                                owner_id=job.owner_id,
-                                scan_job_id=job.id,
-                                account_id=account.id,
-                                url=link.url,
-                                url_hash=link.url_hash,
-                                source_title=title,
-                                source_username=username,
-                                source_type=kind or "private",
-                                source_message_id=int(message.id),
-                                source_message_url=source_url,
-                                message_date=message_date,
-                            ))
-                            job.unique_links += 1
-                        db.session.commit()
+                            seen_message_ids.add(message_id)
+                            message_date = getattr(message, "date", None)
+                            if job.start_date and message_date and message_date < job.start_date:
+                                continue
+                            job.messages_scanned += 1
+                            links = [item for item in _extract_message_links(message) if item.link_type == "whatsapp" and _is_whatsapp_group_link(item)]
+                            if not links:
+                                continue
+                            job.links_found += len(links)
+                            source_url = public_message_url(username, int(message.id))
+                            for link in links:
+                                existing = WhatsAppLink.query.filter_by(scan_job_id=job.id, url_hash=link.url_hash).first()
+                                if existing:
+                                    continue
+                                db.session.add(WhatsAppLink(
+                                    owner_id=job.owner_id,
+                                    scan_job_id=job.id,
+                                    account_id=account.id,
+                                    url=link.url,
+                                    url_hash=link.url_hash,
+                                    source_title=title,
+                                    source_username=username,
+                                    source_type=kind or "private",
+                                    source_message_id=int(message.id),
+                                    source_message_url=source_url,
+                                    message_date=message_date,
+                                ))
+                                job.unique_links += 1
+                            db.session.commit()
+                    
                 except FloodWaitError as exc:
                     errors.append(f"account {account.id}: FloodWait {exc.seconds}s")
                     break
@@ -1352,6 +1373,7 @@ async def _inspect_join_link(client, row):
 
 
 JOINABLE_POOL_STATUSES = ["valid_public", "valid_invite", "already_member", "joined", "join_request_pending"]
+SUBMITTABLE_JOIN_STATUSES = ["discovered", "check_failed", "valid_public", "valid_invite", "join_request_pending"]
 
 
 def _dedupe_rows_by_hash(rows):
@@ -1399,7 +1421,7 @@ def _global_join_pool_for_mode(owner_id, mode, exclude_hashes=None, limit=10):
     exclude_hashes = exclude_hashes or set()
     query = DiscoveredJoinLink.query.filter(
         DiscoveredJoinLink.owner_id == owner_id,
-        DiscoveredJoinLink.status.in_(JOINABLE_POOL_STATUSES),
+        DiscoveredJoinLink.status.in_(SUBMITTABLE_JOIN_STATUSES),
     )
     if mode == "groups":
         query = query.filter(DiscoveredJoinLink.entity_type == "group")
@@ -1608,6 +1630,9 @@ async def _execute_join_job(join_job_id):
                         item.status = "already_member"
                         row.is_already_member = True
                         job.already_member_count += 1
+                    elif row.status == "joined":
+                        item.status = "joined"
+                        job.joined_count += 1
                     elif row.status == "join_request_pending":
                         item.status = "join_request_pending"
                         job.request_pending_count += 1
@@ -1738,8 +1763,8 @@ async def _inspect_join_links(account_id, link_ids):
                     db.session.commit()
                     await asyncio.sleep(max(1, int(exc.seconds)))
             if index < len(rows) - 1:
-                low = max(0.0, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
-                high = max(low, float(get_int(scan.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
+                low = max(0.0, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MIN_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MIN_SECONDS", 2)))))
+                high = max(low, float(get_int(account.owner_id, "JOIN_INSPECT_DELAY_MAX_SECONDS", int(current_app.config.get("JOIN_INSPECT_DELAY_MAX_SECONDS", 4)))))
                 await asyncio.sleep(random.uniform(low, high))
         return {"status": "completed", "count": len(rows)}
     finally:
