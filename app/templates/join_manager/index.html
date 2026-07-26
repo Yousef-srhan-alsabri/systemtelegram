@@ -153,7 +153,38 @@
       <div class="selection-toolbar">
         <div class="selection-summary">
           <strong>الروابط المكتشفة</strong>
+          <span class="link-count" id="visibleLinksCount">عرض <span id="visibleCount">0</span> من <span id="totalCount">0</span></span>
           <span id="selectedLinksCount">0 محدد</span>
+        </div>
+        <div class="row gx-2 gy-2 mb-2 align-items-center">
+          <div class="col-md-4">
+            <input id="linkFilterText" class="form-control" type="search" placeholder="ابحث في الاسم أو الرابط أو المصدر" aria-label="بحث في الروابط">
+          </div>
+          <div class="col-auto">
+            <select id="linkTypeFilter" class="form-select">
+              <option value="all">كل الأنواع</option>
+              <option value="groups">قروبات</option>
+              <option value="channels">قنوات</option>
+              <option value="invites">دعوات</option>
+              <option value="unknown">غير معروف</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <select id="linkSourceFilter" class="form-select">
+              <option value="all">كل المصادر</option>
+              <option value="source">من المصدر</option>
+              <option value="search">من البحث</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <select id="linkSortOrder" class="form-select">
+              <option value="default">فرز افتراضي</option>
+              <option value="name">حسب الاسم</option>
+              <option value="url">حسب الرابط</option>
+              <option value="type">حسب النوع</option>
+              <option value="status">حسب الحالة</option>
+            </select>
+          </div>
         </div>
         <div class="action-row">
           <button type="button" id="selectAllLinksBtn" class="btn btn-sm btn-outline-primary">تحديد الصالح</button>
@@ -297,6 +328,22 @@
 {% block scripts %}
 <script>
 let joinSelectionRun = 0;
+let originalLinkRows = [];
+
+function getLinkRowData(row) {
+  const box = row.querySelector('.join-link-check');
+  return {
+    box,
+    name: (row.cells[1]?.textContent || '').trim().toLowerCase(),
+    url: (row.cells[2]?.textContent || '').trim().toLowerCase(),
+    type: box?.dataset.type || '',
+    invite: box?.dataset.invite === '1',
+    approval: box?.dataset.approval === '1',
+    source: box?.dataset.source || 'search',
+    status: (row.cells[4]?.textContent || '').trim().toLowerCase(),
+    sourceText: (row.cells[5]?.textContent || '').trim().toLowerCase(),
+  };
+}
 
 function linkMatchesMode(box, mode, sourceMode) {
   if (box.disabled || mode === 'none') return false;
@@ -313,6 +360,92 @@ function linkMatchesMode(box, mode, sourceMode) {
     (mode === 'invites' && invite) ||
     (mode === 'approval' && approval)
   );
+}
+
+function rowMatchesFilters(row, textFilter, typeFilter, sourceFilter) {
+  const data = getLinkRowData(row);
+  const foundText = [data.name, data.url, data.status, data.sourceText, data.source].join(' ');
+  const matchesText = !textFilter || foundText.includes(textFilter);
+  const matchesSource = sourceFilter === 'all' || data.source === sourceFilter;
+
+  let matchesType = true;
+  if (typeFilter === 'groups') {
+    matchesType = data.type === 'group' || data.invite || (!data.type && !data.invite);
+  } else if (typeFilter === 'channels') {
+    matchesType = data.type === 'channel' || (!data.type && !data.invite);
+  } else if (typeFilter === 'invites') {
+    matchesType = data.invite;
+  } else if (typeFilter === 'unknown') {
+    matchesType = !data.type && !data.invite;
+  }
+
+  return matchesText && matchesSource && matchesType;
+}
+
+function compareLinkRows(a, b, order) {
+  if (order === 'default') return Number(a.dataset.order) - Number(b.dataset.order);
+  const dataA = getLinkRowData(a);
+  const dataB = getLinkRowData(b);
+  let valueA = '';
+  let valueB = '';
+
+  if (order === 'name') {
+    valueA = dataA.name;
+    valueB = dataB.name;
+  } else if (order === 'url') {
+    valueA = dataA.url;
+    valueB = dataB.url;
+  } else if (order === 'type') {
+    const typeRank = t => (t.type === 'group' ? 1 : t.type === 'channel' ? 2 : t.invite ? 3 : 4);
+    return typeRank(dataA) - typeRank(dataB) || dataA.name.localeCompare(dataB.name);
+  } else if (order === 'status') {
+    valueA = dataA.status;
+    valueB = dataB.status;
+  }
+  return valueA.localeCompare(valueB, 'ar') || Number(a.dataset.order) - Number(b.dataset.order);
+}
+
+function updateLinkTableCounts() {
+  const rows = originalLinkRows;
+  const visibleRows = rows.filter(row => row.style.display !== 'none');
+  const totalCount = rows.length;
+  const visibleCount = visibleRows.length;
+  document.getElementById('totalCount').textContent = totalCount;
+  document.getElementById('visibleCount').textContent = visibleCount;
+
+  const tbody = document.querySelector('.join-links-table tbody');
+  if (!tbody) return;
+  const emptyFilterRow = tbody.querySelector('.empty-filter-row');
+  if (visibleCount === 0 && totalCount > 0) {
+    if (!emptyFilterRow) {
+      const row = document.createElement('tr');
+      row.className = 'empty-filter-row';
+      row.innerHTML = '<td colspan="6" class="empty-state">لا توجد روابط تطابق الفلاتر الحالية.</td>';
+      tbody.appendChild(row);
+    }
+  } else if (emptyFilterRow) {
+    emptyFilterRow.remove();
+  }
+}
+
+function applyLinkTableSorting() {
+  const order = document.getElementById('linkSortOrder')?.value || 'default';
+  const tbody = document.querySelector('.join-links-table tbody');
+  if (!tbody) return;
+  const rows = Array.from(originalLinkRows);
+  rows.sort((a, b) => compareLinkRows(a, b, order));
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+function applyLinkTableFilters() {
+  const textFilter = document.getElementById('linkFilterText')?.value.trim().toLowerCase() || '';
+  const typeFilter = document.getElementById('linkTypeFilter')?.value || 'all';
+  const sourceFilter = document.getElementById('linkSourceFilter')?.value || 'all';
+  originalLinkRows.forEach(row => {
+    row.style.display = rowMatchesFilters(row, textFilter, typeFilter, sourceFilter) ? '' : 'none';
+  });
+  applyLinkTableSorting();
+  updateLinkTableCounts();
 }
 
 function selectedJoinAccountsCount() {
@@ -397,6 +530,9 @@ function confirmJoinMode() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+  const linkRows = Array.from(document.querySelectorAll('.join-links-table tbody tr'));
+  originalLinkRows = linkRows.filter(row => row.querySelector('.join-link-check'));
+  originalLinkRows.forEach((row, index) => row.dataset.order = index);
   document.getElementById('toggleAllJoinLinks')?.addEventListener('change', event => selectJoinLinks(event.target.checked ? 'all' : 'none'));
   document.getElementById('selectAllAccountsBtn')?.addEventListener('click', () => selectJoinAccounts('all'));
   document.getElementById('clearAccountsBtn')?.addEventListener('click', () => selectJoinAccounts('none'));
@@ -434,6 +570,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (map[event.target.value]) selectJoinLinks(map[event.target.value], true);
   });
   document.querySelectorAll('.join-link-check').forEach(box => box.addEventListener('change', () => updateSelectedLinksCount(false)));
+  document.getElementById('linkFilterText')?.addEventListener('input', applyLinkTableFilters);
+  document.getElementById('linkTypeFilter')?.addEventListener('change', applyLinkTableFilters);
+  document.getElementById('linkSourceFilter')?.addEventListener('change', applyLinkTableFilters);
+  document.getElementById('linkSortOrder')?.addEventListener('change', applyLinkTableFilters);
   document.getElementById('joinExecuteForm')?.addEventListener('submit', event => {
     const activeData = document.getElementById('joinExecuteForm')?.dataset.activeAccountIds || '';
     const busy = new Set(activeData.split(',').filter(Boolean).map(Number));
@@ -456,6 +596,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     if (distributionHint) distributionHint.textContent = hints[distribution.value];
   });
+  applyLinkTableFilters();
   updateSelectedLinksCount();
   updateSelectedAccountsCount();
   document.querySelectorAll('.scan-progress').forEach(row => {
