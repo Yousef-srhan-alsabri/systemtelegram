@@ -79,6 +79,10 @@ def ensure_legacy_columns():
         _add_column("search_jobs", "exclude_system_sources", f"BOOLEAN NOT NULL DEFAULT {_bool_default(True)}", columns)
         _add_column("search_jobs", "expanded_queries_json", "TEXT", columns)
 
+    if "whatsapp_scan_jobs" in tables:
+        columns = {column["name"] for column in inspector.get_columns("whatsapp_scan_jobs")}
+        _add_column("whatsapp_scan_jobs", "exclude_system_sources", f"BOOLEAN NOT NULL DEFAULT {_bool_default(True)}", columns)
+
     if "join_jobs" in tables:
         columns = {column["name"] for column in inspector.get_columns("join_jobs")}
         additions = {

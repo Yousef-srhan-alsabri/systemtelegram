@@ -1121,9 +1121,11 @@ async def _execute_whatsapp_scan_job(job_id, account_ids):
                 errors.append(f"account {account.id}: unauthorized")
                 continue
 
-            system_usernames, system_ids, system_titles = _system_source_identity_sets(job.owner_id)
-            await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids, system_titles)
-            await _add_export_ref_to_system_sets(client, job.export_channel_ref, system_usernames, system_ids, system_titles)
+            system_usernames, system_ids, system_titles = (set(), set(), set())
+            if getattr(job, "exclude_system_sources", True):
+                system_usernames, system_ids, system_titles = _system_source_identity_sets(job.owner_id)
+                await _resolve_system_sources_with_client(client, job.owner_id, system_usernames, system_ids, system_titles)
+                await _add_export_ref_to_system_sets(client, job.export_channel_ref, system_usernames, system_ids, system_titles)
 
             dialogs = await client.get_dialogs(limit=None)
             for dialog in dialogs:

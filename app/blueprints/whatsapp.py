@@ -49,6 +49,7 @@ def index():
         elif export_mode in {"channel", "both"} and export_account_id not in {a.id for a in accounts}:
             flash("اختر حساباً ناشراً صالحاً لقناة التصدير.", "danger")
         else:
+            exclude_system_sources = request.form.get("exclude_system_sources", "0") == "1"
             job = WhatsAppScanJob(
                 owner_id=current_user.id,
                 scope=scope,
@@ -56,6 +57,7 @@ def index():
                 export_mode=export_mode,
                 export_channel_ref=export_channel_ref or None,
                 export_account_id=export_account_id if export_mode in {"channel", "both"} else None,
+                exclude_system_sources=exclude_system_sources,
             )
             db.session.add(job)
             db.session.flush()
