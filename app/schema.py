@@ -118,3 +118,4 @@ def ensure_legacy_columns():
         _add_column("channel_posts", "scheduled_at", _dt_type(), columns)
         _add_column("channel_posts", "auto_pin", f"BOOLEAN NOT NULL DEFAULT {_bool_default(False)}", columns)
         _add_column("channel_posts", "pinned_at", _dt_type(), columns)
+
